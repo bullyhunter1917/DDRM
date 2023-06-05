@@ -1,6 +1,7 @@
 import math
 import torch
 from tqdm import tqdm
+from torch import optim
 
 class Diffusion:
     def __init__(self, schedule='linear', steps=1000, img_size=128, device='cuda'):
@@ -80,3 +81,20 @@ class Diffusion:
         x = (x.clamp(-1,1) + 1)/2
         x = (x * 255).type(torch.uint8)
         return x
+    
+    def train(self, model, epochs, device, images,lr):
+        optimizer=optim.AdamW(model.parameters(),lr)
+        lossfunc=nn.MSEloss()
+        
+        for epoch in epochs:
+            for images in batches:
+                images=images.to(device)
+                t=self.sample_timesteps(images.shape[0]).to(device)
+                x_t,epsilon=self.noise_images()
+                predicted_epsilon=model(x_t,t)
+                loss=lossfunc(epsilon,predicted_epsilon)
+                optimizer.zero_grad()
+                lossfunc.backward()
+                optimizer.step()
+        
+# co chcemy: wczytywanie danych, logging, miejsce init modelu/start
