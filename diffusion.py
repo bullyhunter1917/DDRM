@@ -49,8 +49,8 @@ class Diffusion:
         '''
         Noisfied image x at timesteps t
         '''
-        sqrt_alpha_hat = torch.sqrt(self.alpha_hat([t]))[:, None, None,None]
-        sqrt_one_minus_alpha_hat = torch.sqrt(1-self.alpha_hat([t]))[:, None, None, None]
+        sqrt_alpha_hat = torch.sqrt(self.alpha_hat[t])[:, None, None,None]
+        sqrt_one_minus_alpha_hat = torch.sqrt(1-self.alpha_hat[t])[:, None, None, None]
         #random noise
         eps = torch.randn_like(x)
         return sqrt_alpha_hat * x + sqrt_one_minus_alpha_hat * eps, eps
@@ -85,10 +85,10 @@ class Diffusion:
     
     def train(self, model, epochs, device, data,lr):
         optimizer=optim.AdamW(model.parameters(),lr)
-        lossfunc=nn.MSEloss()
+        lossfunc=nn.MSELoss()
         l = len(data)
         logger = SummaryWriter("trainingrun")
-        for epoch in epochs:
+        for epoch in range(epochs):
             pbar = tqdm(data)
             for j, (x, _) in enumerate(pbar):
                 images = x.to(device)

@@ -5,7 +5,7 @@ from torchvision.datasets import CIFAR10, LSUN, CelebA
 from torch.utils.data import DataLoader
 import torchvision.transforms as trans
 from torchvision.utils import make_grid
-import Image
+from PIL import Image
 
 def save_images(images, path):
     grid = make_grid(images)

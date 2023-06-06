@@ -81,6 +81,9 @@ class DoubleConv(nn.Module):
 
     def forward(self, x):
         if self.residual:
+            #tu się rozmiary nie zgadzają, also gdzie mamy resigual?
+            print(x.size())
+            print(self.double_conv(x).size())
             return nn.functional.gelu(x + self.double_conv(x))
         else:
             return self.double_conv(x)
