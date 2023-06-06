@@ -55,7 +55,7 @@ class Diffusion:
     def sample_timesteps(self,n):
         return torch.randint(low=1, high=self.steps, size=(n,))
     
-    def sample(self, model, n, labels, cfg_scale=3):
+    def sample(self, model, n):
         print(f"Sampling {n} new images....")
         model.eval()
 
@@ -65,11 +65,8 @@ class Diffusion:
 
             for i in tqdm(reversed(range(1, self.steps)), position=0):
                 t = (torch.ones(n) * i).long().to(self.device)
-                predicted_noise = model(x, t, labels)
-                if cfg_scale > 0:
-                    uncond_predicted_noise = model(x, t, None)
-                    predicted_noise = torch.lerp(uncond_predicted_noise, predicted_noise, cfg_scale)
-               
+                predicted_noise = model(x, t)
+
                 alpha = self.alpha[t][:, None,None,None]
                 alpha_hat = self.alpha_hat[t][:, None, None, None]
                 beta = self.beta[t][:, None, None, None]
@@ -99,8 +96,10 @@ class Diffusion:
                 lossfunc.backward()
                 optimizer.step()
 
+
     # add here saving model and pictures every n epochs
 
     def gen(self, model, size):
-        pictures = self.sample(model, size, None)
+        pictures = self.sample(model, size)
         return pictures
+
