@@ -11,15 +11,15 @@ class model(nn.Module):
         self.time_dim = time_dim
         self.device = device
 
-        self.input = DoubleConv(3, 64) # res 256 channels 64
+        self.input = DoubleConv(3, 64) # res 128 channels 64
 
-        self.down1 = Down(64, 128) # res 128 channels 128
-        self.down2 = Down(128, 256) # res 64 channels 256
-        self.down3 = Down(256, 512) # res 32 channels 512
+        self.down1 = Down(64, 128) # res 64 channels 128
+        self.down2 = Down(128, 256) # res 32 channels 256
+        self.down3 = Down(256, 512) # res 16 channels 512
 
-        self.d = nn.AvgPool2d(kernel_size=2) # res 16
+        self.d = nn.AvgPool2d(kernel_size=2) # res 8
         self.conv_mid_1 = DoubleConv(512, 1024)
-        self.sa = SelfAttention(1024, 16)
+        self.sa = SelfAttention(1024, 8) # <--- Here you can change image size calculate it according to previous comments
         self.conv_mid_2 = DoubleConv(1024, 512)
 
         self.up1 = Up(1024, 256) # channels 1024
@@ -40,7 +40,7 @@ class model(nn.Module):
 
         return pos_enc
 
-    def forward(self, x, t):
+    def forward(self, x, t, labels=None):
         t = t.unsqueeze(-1).type(torch.float)
         t = self.pos_encoding(t, self.time_dim)
 

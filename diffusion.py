@@ -2,6 +2,7 @@ import math
 import torch
 from tqdm import tqdm
 from torch import optim
+from torch import nn
 
 class Diffusion:
     def __init__(self, schedule='linear', steps=1000, img_size=128, device='cuda'):
@@ -66,7 +67,7 @@ class Diffusion:
                 t = (torch.ones(n) * i).long().to(self.device)
                 predicted_noise = model(x, t, labels)
                 if cfg_scale > 0:
-                    uncond_predicted_noise = model(x,labels, None)
+                    uncond_predicted_noise = model(x, t, None)
                     predicted_noise = torch.lerp(uncond_predicted_noise, predicted_noise, cfg_scale)
                
                 alpha = self.alpha[t][:, None,None,None]
@@ -87,14 +88,19 @@ class Diffusion:
         lossfunc=nn.MSEloss()
         
         for epoch in epochs:
-            for images in batches:
-                images=images.to(device)
-                t=self.sample_timesteps(images.shape[0]).to(device)
-                x_t,epsilon=self.noise_images()
-                predicted_epsilon=model(x_t,t)
-                loss=lossfunc(epsilon,predicted_epsilon)
+            pbar = tqdm(images)
+            for j, (x, _) in enumerate(pbar):
+                images = x.to(device)
+                t = self.sample_timesteps(x.shape[0]).to(device)
+                x_t, epsilon = self.noise_images()
+                predicted_epsilon = model(x_t,t)
+                loss = lossfunc(epsilon,predicted_epsilon)
                 optimizer.zero_grad()
                 lossfunc.backward()
                 optimizer.step()
-        
-# co chcemy: wczytywanie danych, logging, miejsce init modelu/start
+
+    # add here saving model and pictures every n epochs
+
+    def gen(self, model, size):
+        pictures = self.sample(model, size, None)
+        return pictures
