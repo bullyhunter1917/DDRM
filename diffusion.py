@@ -1,8 +1,11 @@
+import os
 import math
 import torch
 from tqdm import tqdm
 from torch import optim
 from torch import nn
+from utils import save_images
+from torch.utils.tensorboard import SummaryWriter
 
 class Diffusion:
     def __init__(self, schedule='linear', steps=1000, img_size=128, device='cuda'):
@@ -80,24 +83,29 @@ class Diffusion:
         x = (x * 255).type(torch.uint8)
         return x
     
-    def train(self, model, epochs, device, images,lr):
+    def train(self, model, epochs, device, data,lr):
         optimizer=optim.AdamW(model.parameters(),lr)
         lossfunc=nn.MSEloss()
-        
+        l = len(data)
+        logger = SummaryWriter("trainingrun")
         for epoch in epochs:
-            pbar = tqdm(images)
+            pbar = tqdm(data)
             for j, (x, _) in enumerate(pbar):
                 images = x.to(device)
                 t = self.sample_timesteps(x.shape[0]).to(device)
-                x_t, epsilon = self.noise_images()
+                x_t, epsilon = self.noise_images(images,t)
                 predicted_epsilon = model(x_t,t)
                 loss = lossfunc(epsilon,predicted_epsilon)
                 optimizer.zero_grad()
                 lossfunc.backward()
                 optimizer.step()
+                logger.add_scalar("MSE", loss.item(), global_step=epoch * l + j)
 
-
-    # add here saving model and pictures every n epochs
+#sampling and saving params
+        sampled_images = self.sample(model, 10)
+        save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
+        torch.save(model.state_dict(), os.path.join("models", f"ckpt.pt"))
+    
 
     def gen(self, model, size):
         pictures = self.sample(model, size)
