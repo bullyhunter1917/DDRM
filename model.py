@@ -81,9 +81,7 @@ class DoubleConv(nn.Module):
 
     def forward(self, x):
         if self.residual:
-            #tu się rozmiary nie zgadzają, also gdzie mamy resigual?
-            print(x.size())
-            print(self.double_conv(x).size())
+            #jest git
             return nn.functional.gelu(x + self.double_conv(x))
         else:
             return self.double_conv(x)
@@ -94,8 +92,8 @@ class Down(nn.Module):
 
         self.down = nn.Sequential(
             nn.MaxPool2d(kernel_size=2),
-            DoubleConv(input_channels, output_channels, residual=True),
-            DoubleConv(output_channels, output_channels)
+            DoubleConv(input_channels, input_channels, residual=True),
+            DoubleConv(input_channels, output_channels)
         )
 
         self.emb_layer = nn.Sequential(

@@ -97,7 +97,7 @@ class Diffusion:
                 predicted_epsilon = model(x_t,t)
                 loss = lossfunc(epsilon,predicted_epsilon)
                 optimizer.zero_grad()
-                lossfunc.backward()
+                loss.backward()
                 optimizer.step()
                 logger.add_scalar("MSE", loss.item(), global_step=epoch * l + j)
 
