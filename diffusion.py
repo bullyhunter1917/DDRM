@@ -6,6 +6,12 @@ from torch import optim
 from torch import nn
 from utils import save_images
 from torch.utils.tensorboard import SummaryWriter
+import torch_xla
+import torch_xla.core.xla_model as xm
+import torch_xla.distributed.parallel_loader as pl
+import torch_xla.distributed.xla_multiprocessing as xmp
+
+
 
 class Diffusion:
     def __init__(self, schedule='linear', steps=1000, img_size=128, device='cuda'):

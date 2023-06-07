@@ -6,6 +6,12 @@ from torch.utils.data import DataLoader
 import torchvision.transforms as trans
 from torchvision.utils import make_grid
 from PIL import Image
+import torch
+import torch_xla
+import torch_xla.core.xla_model as xm
+import torch_xla.distributed.parallel_loader as pl
+import torch_xla.distributed.xla_multiprocessing as xmp
+import torch_xla.utils.utils as xu
 
 def save_images(images, path):
     grid = make_grid(images)
@@ -24,7 +30,7 @@ if __name__=='__main__':
     args = vars(ap.parse_args())
 
     # Hyperparameters
-    DEVICE = 'cuda'
+    DEVICE = xm.xla_device()
     SIZE = 128
     EPOCH = 500
     BATCH_SIZE = 12
@@ -42,16 +48,27 @@ if __name__=='__main__':
     #_train_sets = torch.utils.data.ConcatDataset([_cifar10, _lsun, _celeba])
     #_train_loader = DataLoader(dataset=_train_sets, BATCH_SIZE, shuffle=True)
 
+    train_sampler = torch.utils.data.distributed.DistributedSampler(
+    _cifar10,
+    num_replicas=xm.xrt_world_size(),
+    rank=xm.get_ordinal(),
+    shuffle=True)
     _trainDataLoader = DataLoader(_cifar10, BATCH_SIZE, shuffle=True)
 
-    _model = model(3, 3).to(DEVICE)
+
+    SERIAL_EXEC = xmp.MpSerialExecutor()
+
+    WRAPPED_MODEL=xmp.MpModelWrapper(model(3, 3))
+    
+    lr=LR*xm.xrt_world_size()
+
     _diffusion = diffusion.Diffusion()
 
     if args['number'] == 0:
         print("TRENING")
-        _diffusion.train(_model, EPOCH, DEVICE, _trainDataLoader, LR)
+        _diffusion.train(WRAPPED_MODEL, EPOCH, DEVICE, _trainDataLoader, lr)
     else:
         print('GEN')
-        pictures = _diffusion.gen(_model, args['number'])
+        pictures = _diffusion.gen(WRAPPED_MODEL, args['number'])
         save_images(pictures, f'output\{args["number"]}.jpg')
         #output\GeneratedPics\
