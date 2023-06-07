@@ -11,6 +11,7 @@ def save_images(images, path):
     grid = make_grid(images)
     ndarr = grid.permute(1, 2, 0).to("cpu").numpy()
     im = Image.fromarray(ndarr)
+    print(path)
     im.save(path)
 
 if __name__=='__main__':
@@ -52,4 +53,5 @@ if __name__=='__main__':
     else:
         print('GEN')
         pictures = _diffusion.gen(_model, args['number'])
-        save_images(pictures, f'output/GeneratedPics/{args["number"]}.jpg')
+        save_images(pictures, f'output\{args["number"]}.jpg')
+        #output\GeneratedPics\
