@@ -10,11 +10,11 @@ import torch_xla
 import torch_xla.core.xla_model as xm
 import torch_xla.distributed.parallel_loader as pl
 import torch_xla.distributed.xla_multiprocessing as xmp
-
+#import torch_xla.utils.serialization as xser
 
 
 class Diffusion:
-    def __init__(self, schedule='linear', steps=1000, img_size=128, device='cuda'):
+    def __init__(self, model, schedule='linear', steps=1000, img_size=128, device='cuda'):
         self.schedule = schedule
         self.steps = steps
         self.img_size = img_size
@@ -23,6 +23,7 @@ class Diffusion:
         self.beta = self.make_noise_schedule()
         self.alpha = 1-self.beta
         self.alpha_hat = torch.cumprod(self.alpha, dim=0)
+        self.model=model
 
     def make_noise_schedule(self):
         ''' 
@@ -64,9 +65,9 @@ class Diffusion:
     def sample_timesteps(self,n):
         return torch.randint(low=1, high=self.steps, size=(n,))
     
-    def sample(self, model, n):
+    def sample(self, n):
         print(f"Sampling {n} new images....")
-        model.eval()
+        self.model.eval()
 
         # see Algorithm 2 Sampling from "Denoising Diffusion Probabilistic Models"
         with torch.no_grad():
@@ -74,7 +75,7 @@ class Diffusion:
 
             for i in tqdm(reversed(range(1, self.steps)), position=0):
                 t = (torch.ones(n) * i).long().to(self.device)
-                predicted_noise = model(x, t)
+                predicted_noise = self.model(x, t)
 
                 alpha = self.alpha[t][:, None,None,None]
                 alpha_hat = self.alpha_hat[t][:, None, None, None]
@@ -84,16 +85,18 @@ class Diffusion:
 
                 x = 1 / torch.sqrt(alpha) * (x -  ((1-alpha) / (torch.sqrt(1-alpha_hat))) * predicted_noise) + torch.sqrt(beta) * noise
         
-        model.train()
+        self.model.train()
         x = (x.clamp(-1,1) + 1)/2
         x = (x * 255).type(torch.uint8)
         return x
     
-    def train(self, model, epochs, device, data,lr):
-        optimizer=optim.AdamW(model.parameters(),lr)
+    def train(self, epochs, device, data,lr):
+        optimizer=optim.AdamW(self.model.parameters(),lr)
         lossfunc=nn.MSELoss()
         l = len(data)
-        logger = SummaryWriter("trainingrun1")
+        #logger = SummaryWriter("trainingrun1")
+        tracker = xm.RateTracker()
+        self.model.train()
         for epoch in range(epochs):
             pbar = tqdm(data)
             for j, (x, _) in enumerate(pbar):
@@ -105,14 +108,36 @@ class Diffusion:
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                logger.add_scalar("MSE", loss.item(), global_step=epoch * l + j)
+                #logger.add_scalar("MSE", loss.item(), global_step=epoch * l + j)
             
             sampled_images = self.sample(model, 1)
             save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
             torch.save(model.state_dict(), os.path.join("models", f"ckpt.pt"))
 
-#sampling and saving params
-        
+
+    def trainfunc(self,loader):
+        for i, (x,y) in enumerate(loader):
+            images = x.to(self.device)
+            t = self.sample_timesteps(x.shape[0]).to(self.device)
+            x_t, epsilon = self.noise_images(images,t)
+            predicted_epsilon = self.model(x_t,t)
+            loss = self.lossfunc(epsilon,predicted_epsilon)
+            loss.backward()
+            xm.optimizer
+
+
+
+    def train_xla(self, epochs, device, data,lr):
+        self.lossfunc=nn.MSELoss()
+        for epoch in range(epochs):   
+            para_loader = pl.ParallelLoader(data, device)
+            trainfunc(para_loader.per_device_loader(device))
+            xm.master_print("Finished training epoch {}".format(epoch))
+            if epoch%10==0:
+                sampled_images = self.sample(10)
+                #uwaga przy tym zapisywaniu może trzeba zmienić
+                save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
+    
     
 
     def gen(self, model, size):

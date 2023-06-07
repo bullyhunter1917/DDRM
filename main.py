@@ -20,6 +20,21 @@ def save_images(images, path):
     print(path)
     im.save(path)
 
+def load_dataset():
+    _cifar10 = CIFAR10(root='data', train=True, transform=transform, download=True)
+    return _cifar10
+
+def _mp_fn(index, epochs, data,lr):
+    torch.set_default_tensor_type('torch.FloatTensor')
+    device = xm.xla_device()
+    model=WRAPPED_MODEL.to(device)
+    #pytanie co z tym czy to
+    #gdyby diffusion nie dostawało modelu ani device można by zainicjować wcześniej, a tu tywoływać już funkcję z ospowiednimi
+    _diffusion = diffusion.Diffusion(model,device=device)
+    
+    _diffusion.train_xla(epochs, device, data, lr)
+
+
 if __name__=='__main__':
     ap = argparse.ArgumentParser()
     ap.add_argument("-m", "--model", type=str, required=True,
@@ -30,31 +45,11 @@ if __name__=='__main__':
     args = vars(ap.parse_args())
 
     # Hyperparameters
-    DEVICE = xm.xla_device()
+    
     SIZE = 128
     EPOCH = 500
     BATCH_SIZE = 12
     LR = 3e-4
-
-    # Loading datasets
-    transform = trans.Compose([trans.Resize((SIZE, SIZE)),
-                               trans.ToTensor()])
-
-    _cifar10 = CIFAR10(root='data', train=True, transform=transform, download=True)
-    #_lsun = LSUN(root='data', transform=transform)
-    #_celeba = CelebA(root='data', split='train', transform=transform, download=True)
-
-    # Add when lsun and celba are added/download
-    #_train_sets = torch.utils.data.ConcatDataset([_cifar10, _lsun, _celeba])
-    #_train_loader = DataLoader(dataset=_train_sets, BATCH_SIZE, shuffle=True)
-
-    train_sampler = torch.utils.data.distributed.DistributedSampler(
-    _cifar10,
-    num_replicas=xm.xrt_world_size(),
-    rank=xm.get_ordinal(),
-    shuffle=True)
-    _trainDataLoader = DataLoader(_cifar10, BATCH_SIZE, shuffle=True)
-
 
     SERIAL_EXEC = xmp.MpSerialExecutor()
 
@@ -62,12 +57,37 @@ if __name__=='__main__':
     
     lr=LR*xm.xrt_world_size()
 
-    _diffusion = diffusion.Diffusion()
+    # Loading datasets
+    transform = trans.Compose([trans.Resize((SIZE, SIZE)),
+                               trans.ToTensor()])
+    
+    _cifar10=SERIAL_EXEC.run(load_dataset)
+    #_lsun = LSUN(root='data', transform=transform)
+    #_celeba = CelebA(root='data', split='train', transform=transform, download=True)
+
+    # Add when lsun and celba are added/download
+    #_train_sets = torch.utils.data.ConcatDataset([_cifar10, _lsun, _celeba])
+    #_train_loader = DataLoader(dataset=_train_sets, BATCH_SIZE, shuffle=True)
+
+    # train_sampler = torch.utils.data.distributed.DistributedSampler(
+    # _cifar10,
+    # num_replicas=xm.xrt_world_size(),
+    # rank=xm.get_ordinal(),
+    # shuffle=True)
+    _trainDataLoader = DataLoader(_cifar10, BATCH_SIZE, shuffle=True)
+
+
+
+
+    
 
     if args['number'] == 0:
         print("TRENING")
-        _diffusion.train(WRAPPED_MODEL, EPOCH, DEVICE, _trainDataLoader, lr)
+        xmp.spawn(_mp_fn, args=(),
+          start_method='fork')
+        _diffusion.train_xla( EPOCH, DEVICE, _trainDataLoader, lr)
     else:
+        #trzeba będzie dodać znowu wczytywanie modelu w tym wypadku
         print('GEN')
         pictures = _diffusion.gen(WRAPPED_MODEL, args['number'])
         save_images(pictures, f'output\{args["number"]}.jpg')
