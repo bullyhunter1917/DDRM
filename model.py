@@ -28,6 +28,7 @@ class model(nn.Module):
         self.up4 = Up(128, 64)
 
         self.end = nn.Conv2d(kernel_size=1, in_channels=64, out_channels=output_channels)
+        #2 warianty, albo bez wrappowania - tworzymy w każdym mp wtedy zostaje albo wywalić to device i zobzczymy co będzie
     def pos_encoding(self, t, channels):
         inv_freq = 1.0 / (
             10000
