@@ -5,6 +5,7 @@ from tqdm import tqdm
 from torch import optim
 from torch import nn
 from utils import save_images
+from utils import Obscure_images
 from torch.utils.tensorboard import SummaryWriter
 
 class Diffusion:
@@ -92,10 +93,10 @@ class Diffusion:
             pbar = tqdm(data)
             for j, (x, _) in enumerate(pbar):
                 images = x.to(device)
-                x_b = obscure_images(images).imgs
+                x_b = Obscure_images(images).imgs
                 t = self.sample_timesteps(x.shape[0]).to(device)
                 x_t, epsilon = self.noise_images(images,t)
-                x_d = torch.concat( (x_t,x_b), dim=1)
+                x_d = torch.concat((x_t,x_b), dim=1)
                 predicted_epsilon = model(x_d,t)
                 loss = lossfunc(epsilon,predicted_epsilon)
                 optimizer.zero_grad()
