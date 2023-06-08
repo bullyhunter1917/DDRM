@@ -148,6 +148,7 @@ class Diffusion:
                 sampled_images = self.sample(model,10)
                 #uwaga przy tym zapisywaniu może trzeba zmienić(chyba nie)
                 save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
+                torch.save(model.state_dict().cpu(), os.path.join("models", f"ckpt{epoch}.pt"))
     
     
 
