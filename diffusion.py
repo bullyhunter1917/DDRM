@@ -92,9 +92,11 @@ class Diffusion:
             pbar = tqdm(data)
             for j, (x, _) in enumerate(pbar):
                 images = x.to(device)
+                x_b = obscure_images(images).imgs
                 t = self.sample_timesteps(x.shape[0]).to(device)
                 x_t, epsilon = self.noise_images(images,t)
-                predicted_epsilon = model(x_t,t)
+                x_d = torch.concat( (x_t,x_b), dim=1)
+                predicted_epsilon = model(x_d,t)
                 loss = lossfunc(epsilon,predicted_epsilon)
                 optimizer.zero_grad()
                 loss.backward()
