@@ -29,7 +29,7 @@ class model(nn.Module):
         self.end = nn.Conv2d(kernel_size=1, in_channels=64, out_channels=output_channels)
         #2 warianty, albo bez wrappowania - tworzymy w każdym mp wtedy zostaje albo wywalić to device i zobzczymy co będzie
     
-    def pos_encoding(self, t, channels,dev):
+    def pos_encoding(self, t, channels, dev):
         inv_freq = 1.0 / (
             10000
             ** (torch.arange(0, channels, 2, device=dev).float() / channels)

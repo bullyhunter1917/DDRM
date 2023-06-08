@@ -32,7 +32,7 @@ def load_dataset():
     return _cifar10
 
 
-def _mp_fn(index,lr):
+def _mp_fn(index, lr):
     
     EPOCH = 500
     BATCH_SIZE = 128
@@ -51,7 +51,8 @@ def _mp_fn(index,lr):
         _cifar10, 
         batch_size=BATCH_SIZE,
         sampler=train_sampler, 
-        num_workers=8)
+        num_workers=8,
+        drop_last=True)
     
     #pytanie co z tym czy to
     #gdyby diffusion nie dostawało modelu ani device można by zainicjować wcześniej, a tu tywoływać już funkcję z ospowiednimi
@@ -87,8 +88,10 @@ if __name__=='__main__':
     
     if args['number'] == 0:
         print("TRENING")
-        xmp.spawn(_mp_fn, args=(lr,),
-          nprocs=8,start_method='fork')
+        xmp.spawn(_mp_fn, 
+                  args=(lr,),
+                  nprocs=8,
+                  start_method='fork')
         #_diffusion.train_xla( EPOCH, DEVICE, _trainDataLoader, lr)
     else:
         #trzeba będzie dodać znowu wczytywanie modelu w tym wypadku
