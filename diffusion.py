@@ -1,6 +1,7 @@
 import os
 import math
 import torch
+import time
 from tqdm import tqdm
 from torch import optim
 from torch import nn
@@ -12,9 +13,11 @@ import torch_xla.distributed.parallel_loader as pl
 import torch_xla.distributed.xla_multiprocessing as xmp
 #import torch_xla.utils.serialization as xser
 
+#potem to się sprzątnie
+BATCH_SIZE = 12
 
 class Diffusion:
-    def __init__(self, model, schedule='linear', steps=1000, img_size=128, device='cuda'):
+    def __init__(self, schedule='linear', steps=1000, img_size=128, device='cuda'):
         self.schedule = schedule
         self.steps = steps
         self.img_size = img_size
@@ -23,7 +26,7 @@ class Diffusion:
         self.beta = self.make_noise_schedule()
         self.alpha = 1-self.beta
         self.alpha_hat = torch.cumprod(self.alpha, dim=0)
-        self.model=model
+    
 
     def make_noise_schedule(self):
         ''' 
@@ -65,9 +68,9 @@ class Diffusion:
     def sample_timesteps(self,n):
         return torch.randint(low=1, high=self.steps, size=(n,))
     
-    def sample(self, n):
+    def sample(self, model, n):
         print(f"Sampling {n} new images....")
-        self.model.eval()
+        model.eval()
 
         # see Algorithm 2 Sampling from "Denoising Diffusion Probabilistic Models"
         with torch.no_grad():
@@ -75,7 +78,7 @@ class Diffusion:
 
             for i in tqdm(reversed(range(1, self.steps)), position=0):
                 t = (torch.ones(n) * i).long().to(self.device)
-                predicted_noise = self.model(x, t)
+                predicted_noise = model(x, t, self.device)
 
                 alpha = self.alpha[t][:, None,None,None]
                 alpha_hat = self.alpha_hat[t][:, None, None, None]
@@ -85,57 +88,65 @@ class Diffusion:
 
                 x = 1 / torch.sqrt(alpha) * (x -  ((1-alpha) / (torch.sqrt(1-alpha_hat))) * predicted_noise) + torch.sqrt(beta) * noise
         
-        self.model.train()
+        model.train()
         x = (x.clamp(-1,1) + 1)/2
         x = (x * 255).type(torch.uint8)
         return x
     
-    def train(self, epochs, device, data,lr):
-        optimizer=optim.AdamW(self.model.parameters(),lr)
-        lossfunc=nn.MSELoss()
-        l = len(data)
-        #logger = SummaryWriter("trainingrun1")
-        tracker = xm.RateTracker()
-        self.model.train()
-        for epoch in range(epochs):
-            pbar = tqdm(data)
-            for j, (x, _) in enumerate(pbar):
-                images = x.to(device)
-                t = self.sample_timesteps(x.shape[0]).to(device)
-                x_t, epsilon = self.noise_images(images,t)
-                predicted_epsilon = model(x_t,t)
-                loss = lossfunc(epsilon,predicted_epsilon)
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                #logger.add_scalar("MSE", loss.item(), global_step=epoch * l + j)
+    # def train(self, model, epochs, data,lr):
+    #     optimizer=optim.AdamW(model.parameters(),lr)
+    #     lossfunc=nn.MSELoss()
+    #     l = len(data)
+    #     #logger = SummaryWriter("trainingrun1")
+    #     tracker = xm.RateTracker()
+    #     self.model.train()
+    #     for epoch in range(epochs):
+    #         pbar = tqdm(data)
+    #         for j, (x, _) in enumerate(pbar):
+    #             images = x.to(self.device)
+    #             t = self.sample_timesteps(x.shape[0]).to(self.device)
+    #             x_t, epsilon = self.noise_images(images,t)
+    #             predicted_epsilon = model(x_t,t,self.device)
+    #             loss = lossfunc(epsilon,predicted_epsilon)
+    #             optimizer.zero_grad()
+    #             loss.backward()
+    #             optimizer.step()
+    #             #logger.add_scalar("MSE", loss.item(), global_step=epoch * l + j)
             
-            sampled_images = self.sample(model, 1)
-            save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
-            torch.save(model.state_dict(), os.path.join("models", f"ckpt.pt"))
+    #         sampled_images = self.sample(model, 1)
+    #         save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
+    #         torch.save(model.state_dict(), os.path.join("models", f"ckpt.pt"))
 
 
-    def trainfunc(self,loader):
+    def trainfunc(self,model,loader,optimizer):
+        tracker = xm.RateTracker()
         for i, (x,y) in enumerate(loader):
             images = x.to(self.device)
             t = self.sample_timesteps(x.shape[0]).to(self.device)
             x_t, epsilon = self.noise_images(images,t)
-            predicted_epsilon = self.model(x_t,t)
+            predicted_epsilon = model(x_t,t,self.device)
             loss = self.lossfunc(epsilon,predicted_epsilon)
             loss.backward()
-            xm.optimizer
+            xm.optimizer_step(optimizer)
+            tracker.add(BATCH_SIZE)
+            if i % 10 == 0:
+                print('[xla:{}]({}) Loss={:.5f} Rate={:.2f} GlobalRate={:.2f} Time={}'.format(
+            xm.get_ordinal(), x, loss.item(), tracker.rate(),
+            tracker.global_rate(), time.asctime()), flush=True)
 
 
 
-    def train_xla(self, epochs, device, data,lr):
+    def train_xla(self, model,epochs, data,lr):
+        model.train()
         self.lossfunc=nn.MSELoss()
+        optimizer=optim.AdamW(model.parameters(),lr)
         for epoch in range(epochs):   
-            para_loader = pl.ParallelLoader(data, device)
-            trainfunc(para_loader.per_device_loader(device))
+            para_loader = pl.ParallelLoader(data, self.device)
+            self.trainfunc(model,para_loader.per_device_loader(self.device),optimizer)
             xm.master_print("Finished training epoch {}".format(epoch))
             if epoch%10==0:
-                sampled_images = self.sample(10)
-                #uwaga przy tym zapisywaniu może trzeba zmienić
+                sampled_images = self.sample(model,10)
+                #uwaga przy tym zapisywaniu może trzeba zmienić(chyba nie)
                 save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
     
     

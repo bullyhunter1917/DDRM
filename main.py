@@ -20,19 +20,31 @@ def save_images(images, path):
     print(path)
     im.save(path)
 
-def load_dataset():
-    _cifar10 = CIFAR10(root='data', train=True, transform=transform, download=True)
+def load_dataset(trans):
+    _cifar10 = CIFAR10(root='data', train=True, transform=trans, download=True)
     return _cifar10
 
-def _mp_fn(index, epochs, data,lr):
+def _mp_fn(index,lr,trans):
+    
+    EPOCH = 500
+    BATCH_SIZE = 12
+
     torch.set_default_tensor_type('torch.FloatTensor')
-    device = xm.xla_device()
-    model=WRAPPED_MODEL.to(device)
+    dev = xm.xla_device()
+    model=WRAPPED_MODEL.to(dev)
+    _cifar10=SERIAL_EXEC.run(load_dataset(trans))
+    _trainDataLoader = DataLoader(_cifar10, BATCH_SIZE, shuffle=True)
     #pytanie co z tym czy to
     #gdyby diffusion nie dostawało modelu ani device można by zainicjować wcześniej, a tu tywoływać już funkcję z ospowiednimi
-    _diffusion = diffusion.Diffusion(model,device=device)
-    
-    _diffusion.train_xla(epochs, device, data, lr)
+    _diffusion = diffusion.Diffusion(device=dev)
+    #plan:
+    #przenieść te rzeczy z diffusion do funkcji ---device zostaje, model będzie przekazywany
+    #model bez device i w forward podajemy device -- to samo
+    #
+    #i dokończyć przepisywanie trenigu (coloyb i dokumantacja200)
+    #
+    #jeżeli będą z tym problemy, (forward) przerzucamy na kopie, powinna reszta działać
+    _diffusion.train_xla(EPOCH, model, _trainDataLoader, lr)
 
 
 if __name__=='__main__':
@@ -46,10 +58,9 @@ if __name__=='__main__':
 
     # Hyperparameters
     
-    SIZE = 128
-    EPOCH = 500
-    BATCH_SIZE = 12
+    
     LR = 3e-4
+    SIZE = 128
 
     SERIAL_EXEC = xmp.MpSerialExecutor()
 
@@ -61,7 +72,7 @@ if __name__=='__main__':
     transform = trans.Compose([trans.Resize((SIZE, SIZE)),
                                trans.ToTensor()])
     
-    _cifar10=SERIAL_EXEC.run(load_dataset)
+    
     #_lsun = LSUN(root='data', transform=transform)
     #_celeba = CelebA(root='data', split='train', transform=transform, download=True)
 
@@ -74,7 +85,7 @@ if __name__=='__main__':
     # num_replicas=xm.xrt_world_size(),
     # rank=xm.get_ordinal(),
     # shuffle=True)
-    _trainDataLoader = DataLoader(_cifar10, BATCH_SIZE, shuffle=True)
+    
 
 
 
@@ -83,12 +94,12 @@ if __name__=='__main__':
 
     if args['number'] == 0:
         print("TRENING")
-        xmp.spawn(_mp_fn, args=(),
+        xmp.spawn(_mp_fn, args=(lr,transform,),
           start_method='fork')
-        _diffusion.train_xla( EPOCH, DEVICE, _trainDataLoader, lr)
+        #_diffusion.train_xla( EPOCH, DEVICE, _trainDataLoader, lr)
     else:
         #trzeba będzie dodać znowu wczytywanie modelu w tym wypadku
         print('GEN')
-        pictures = _diffusion.gen(WRAPPED_MODEL, args['number'])
-        save_images(pictures, f'output\{args["number"]}.jpg')
+        #pictures = _diffusion.gen(WRAPPED_MODEL, args['number'])
+        #save_images(pictures, f'output\{args["number"]}.jpg')
         #output\GeneratedPics\
