@@ -15,6 +15,11 @@ def get_imgs(sample_size,dataset):
   (x,_ ) =  next(iter(DataLoader(dataset, sample_size, shuffle=True)))
   return x
 
+def valid_pixel_range(T):
+  T = (T.clamp(-1,1) + 1)/2
+  T = (T * 255).type(torch.uint8) #valid pixel range 
+  return T
+
 class Obscure(object):
     """
     Add extra 3 channels to image that will represent obscured image
