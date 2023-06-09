@@ -11,18 +11,20 @@ class model(nn.Module):
         self.time_dim = time_dim
         self.device = device
 
-        self.input = DoubleConv(3, 64) # res 128 channels 64
+        self.input = DoubleConv(6, 64) # res 128 channels 64
 
         self.down1 = Down(64, 128) # res 64 channels 128
         self.down2 = Down(128, 256) # res 32 channels 256
         self.down3 = Down(256, 512) # res 16 channels 512
+        self.sa1 = SelfAttention(512, 16)
 
         self.d = nn.AvgPool2d(kernel_size=2) # res 8
         self.conv_mid_1 = DoubleConv(512, 1024)
-        self.sa = SelfAttention(1024, 8) # <--- Here you can change image size calculate it according to previous comments
+        self.sa2 = SelfAttention(1024, 8) # <--- Here you can change image size calculate it according to previous comments
         self.conv_mid_2 = DoubleConv(1024, 512)
 
         self.up1 = Up(1024, 256) # channels 1024
+        self.sa3 = SelfAttention(256, 16)
         self.up2 = Up(512, 128)
         self.up3 = Up(256, 64)
         self.up4 = Up(128, 64)
@@ -49,13 +51,15 @@ class model(nn.Module):
         x2 = self.down1(x1, t)
         x3 = self.down2(x2, t)
         x4 = self.down3(x3, t)
+        x4 = self.sa1(x4)
 
         x5 = self.d(x4)
         x5 = self.conv_mid_1(x5)
-        x5 = self.sa(x5)
+        x5 = self.sa2(x5)
         x5 = self.conv_mid_2(x5)
 
         x = self.up1(x5, x4, t)
+        x = self.sa3(x)
         x = self.up2(x, x3, t)
         x = self.up3(x, x2, t)
         x = self.up4(x, x1, t)
