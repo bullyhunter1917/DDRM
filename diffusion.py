@@ -50,9 +50,6 @@ class Diffusion:
         '''
         Noisfied image x at timesteps t
         '''
-        x = x_[:,:3]
-        x_obs = x_[:,3:]
-
         sqrt_alpha_hat = torch.sqrt(self.alpha_hat[t])[:, None, None,None]
         sqrt_one_minus_alpha_hat = torch.sqrt(1-self.alpha_hat[t])[:, None, None, None]
         #random noise
@@ -69,12 +66,12 @@ class Diffusion:
 
         # see Algorithm 2 Sampling from "Denoising Diffusion Probabilistic Models"
         with torch.no_grad():
-            x_ = torch.randn(n,3,self.img_size, self.img_size, device=self.device)
-            x = torch.concat((x,images), dim=1)
+            x = torch.randn(n,3,self.img_size, self.img_size, device=self.device)
             
             for i in tqdm(reversed(range(1, self.steps)), position=0):
                 t = (torch.ones(n) * i).long().to(self.device)
-                predicted_noise = model(x, t)
+                # with each step get new restored image concat it with obscured and pass to model
+                predicted_noise = model(torch.concat((x,images),dim=1), t) 
 
                 alpha = self.alpha[t][:, None,None,None]
                 alpha_hat = self.alpha_hat[t][:, None, None, None]
@@ -97,9 +94,13 @@ class Diffusion:
         for epoch in range(epochs):
             pbar = tqdm(data)
             for j, (x, _) in enumerate(pbar):
+                # Those are 6 channels images now, first three Channels are RGB of original later three are from obscured image
                 images = x.to(device)
                 t = self.sample_timesteps(x.shape[0]).to(device)
-                x_t, epsilon = self.noise_images(images,t)
+                #add noise only to original images
+                x_t, epsilon = self.noise_images(images[:,:3],t)    
+                x_t = torch.concat((x_t, images[:,3:]), dim=1)
+
                 predicted_epsilon = model(x_t,t)
                 loss = lossfunc(epsilon,predicted_epsilon)
                 optimizer.zero_grad()
@@ -108,17 +109,18 @@ class Diffusion:
                 logger.add_scalar("MSE", loss.item(), global_step=epoch * l + j)
             
             NR_OF_SAMPLES = 1
-            smpl_imgs = next_iter(data)[:NR_OF_SAMPLES]
-            sampled_images = self.sample(model, NR_OF_SAMPLES, smpl_imgs[:,3:])
-            save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
+            smpl_images = next(iter(data))[:NR_OF_SAMPLES]                           # gets random images
+            restored_images = self.sample(model, NR_OF_SAMPLES, smpl_imgs[:,3:])     # pass obscured this will return restored
+            save_images(smpl_images[:,:3], os.path.join("results", f"{epoch}.jpg"))  # original images, without obscuration
+            save_images(restored_images, os.path.join("results", f"{epoch}.jpg"))    # restored using diffusion 
             torch.save(model.state_dict(), os.path.join("models", f"ckpt.pt"))
 
-#sampling and saving params
         
-    
-
     def gen(self, model, size, dataset):
-        imgs = get_imgs(size, dataset)[:,3:]
-        pictures = self.sample(model, size, imgs)
-        return pictures
+        imgs = get_imgs(size, dataset)
+        pictures_obscured = imgs[:,3:]
+        pictures_original = imgs[:,:3]
+        pictures_restored = self.sample(model, size, pictures_obscured)
+        return pictures_original, pictures_obscured, pictures_restored
+
 
