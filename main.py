@@ -6,6 +6,8 @@ from torch.utils.data import DataLoader
 import torchvision.transforms as trans
 from torchvision.utils import make_grid
 from PIL import Image
+from utils import Obscure
+
 
 def save_images(images, path):
     grid = make_grid(images)
@@ -32,7 +34,8 @@ if __name__=='__main__':
 
     # Loading datasets
     transform = trans.Compose([trans.Resize((SIZE, SIZE)),
-                               trans.ToTensor()])
+                               trans.ToTensor(),
+                               Obscure(SIZE)])
 
     _cifar10 = CIFAR10(root='data', train=True, transform=transform, download=True)
     #_lsun = LSUN(root='data', transform=transform)
