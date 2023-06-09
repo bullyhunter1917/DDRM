@@ -5,7 +5,6 @@ from tqdm import tqdm
 from torch import optim
 from torch import nn
 from utils import save_images
-from utils import Obscure_images
 from torch.utils.tensorboard import SummaryWriter
 
 class Diffusion:
