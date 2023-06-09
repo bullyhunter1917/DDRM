@@ -1,4 +1,5 @@
 import torchvision
+import torch
 from PIL import Image
 import random
 
