@@ -10,6 +10,10 @@ def save_images(images, path, **kwargs):
     im = Image.fromarray(ndarr)
     print(path)
     im.save(path)
+    
+def get_imgs(sample_size,dataset):
+  (x,_ ) =  next(iter(DataLoader(dataset, sample_size, shuffle=True)))
+  return x
 
 class Obscure(object):
     """
@@ -40,6 +44,3 @@ class Obscure(object):
         y_s = random.randint(y_e-self.max_rect_area,y_e)
         x = self.obscure_image(x, x_s,x_e,y_s,y_e)
       return x
-
-def get_imgs(self,sample_size,dataset):
-  return next(iter(DataLoader(dataset, 2, shuffle=True)))
