@@ -54,16 +54,7 @@ def _mp_fn(index, lr):
         num_workers=8,
         drop_last=True)
     
-    #pytanie co z tym czy to
-    #gdyby diffusion nie dostawało modelu ani device można by zainicjować wcześniej, a tu tywoływać już funkcję z ospowiednimi
     _diffusion = diffusion.Diffusion(device=dev)
-    #plan:
-    #przenieść te rzeczy z diffusion do funkcji ---device zostaje, model będzie przekazywany
-    #model bez device i w forward podajemy device -- to samo
-    #
-    #i dokończyć przepisywanie trenigu (coloyb i dokumantacja200)
-    #
-    #jeżeli będą z tym problemy, (forward) przerzucamy na kopie, powinna reszta działać
     _diffusion.train_xla(model, EPOCH, _trainDataLoader, lr)
     
 if __name__=='__main__':
@@ -92,10 +83,7 @@ if __name__=='__main__':
                   args=(lr,),
                   nprocs=8,
                   start_method='fork')
-        #_diffusion.train_xla( EPOCH, DEVICE, _trainDataLoader, lr)
     else:
-        #trzeba będzie dodać znowu wczytywanie modelu w tym wypadku
+        #sampling behaves strangely on tpu's so we leave it for local tests
         print('GEN')
-        #pictures = _diffusion.gen(WRAPPED_MODEL, args['number'])
-        #save_images(pictures, f'output\{args["number"]}.jpg')
-        #output\GeneratedPics\
+    

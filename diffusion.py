@@ -105,8 +105,8 @@ class Diffusion:
             xm.optimizer_step(optimizer)
             tracker.add(BATCH_SIZE)
             if i % 10 == 0:
-                print(f'[xla:{xm.get_ordinal()}] ,cat: {y}, Loss={loss.item()} Rate={tracker.rate()} GlobalRate={tracker.global_rate()} Time={time.asctime()}')
-
+                print(f'[xla:{xm.get_ordinal()}] ,cat: |replace with "y" for cat|, Loss={loss.item()} Rate={tracker.rate()} GlobalRate={tracker.global_rate()} Time={time.asctime()}')
+#                                                                   {y}
 
 
     def train_xla(self, model, epochs, data,lr):
@@ -121,10 +121,12 @@ class Diffusion:
             
             if epoch%10==0:
                 print(epoch)
+                xm.save(model.state_dict(),os.path.join("models", f"ckpt{epoch}.pt"))
+                
+                #sampling behaves strangely on tpu's so we leave it for local tests
                 #sampled_images = self.sample(model,10)
-                #uwaga przy tym zapisywaniu może trzeba zmienić(chyba nie)
                 #save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
-                #torch.save(model.state_dict().cpu(), os.path.join("models", f"ckpt{epoch}.pt"))
+
     
     
 
