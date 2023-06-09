@@ -46,15 +46,18 @@ class Diffusion:
         else:
             raise NotImplementedError(f"unknown beta schedule: {self.schedule}")
 
-    def noise_images(self, x, t):
+    def noise_images(self, x_, t):
         '''
         Noisfied image x at timesteps t
         '''
+        x = x_[:,:3]
+        x_obs = x_[:,3:]
+
         sqrt_alpha_hat = torch.sqrt(self.alpha_hat[t])[:, None, None,None]
         sqrt_one_minus_alpha_hat = torch.sqrt(1-self.alpha_hat[t])[:, None, None, None]
         #random noise
         eps = torch.randn_like(x)
-        return sqrt_alpha_hat * x + sqrt_one_minus_alpha_hat * eps, eps
+        return torch.concat((sqrt_alpha_hat * x + sqrt_one_minus_alpha_hat * eps, x_obs), dim=1) , eps
     
     def sample_timesteps(self,n):
         return torch.randint(low=1, high=self.steps, size=(n,))
@@ -93,11 +96,9 @@ class Diffusion:
             pbar = tqdm(data)
             for j, (x, _) in enumerate(pbar):
                 images = x.to(device)
-                x_b = Obscure_images(images).imgs
                 t = self.sample_timesteps(x.shape[0]).to(device)
                 x_t, epsilon = self.noise_images(images,t)
-                x_d = torch.concat((x_t,x_b), dim=1)
-                predicted_epsilon = model(x_d,t)
+                predicted_epsilon = model(x_t,t)
                 loss = lossfunc(epsilon,predicted_epsilon)
                 optimizer.zero_grad()
                 loss.backward()
