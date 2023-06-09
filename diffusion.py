@@ -4,8 +4,7 @@ import torch
 from tqdm import tqdm
 from torch import optim
 from torch import nn
-from utils import save_images
-from utils import get_imgs
+from utils import *
 from torch.utils.tensorboard import SummaryWriter
 
 class Diffusion:
@@ -82,9 +81,7 @@ class Diffusion:
                 x = 1 / torch.sqrt(alpha) * (x -  ((1-alpha) / (torch.sqrt(1-alpha_hat))) * predicted_noise) + torch.sqrt(beta) * noise
         
         model.train()
-        x = (x.clamp(-1,1) + 1)/2
-        x = (x * 255).type(torch.uint8)
-        return x
+        return valid_pixel_range(x)
     
     def train(self, model, epochs, device, data,lr):
         optimizer=optim.AdamW(model.parameters(),lr)
@@ -117,10 +114,14 @@ class Diffusion:
 
         
     def gen(self, model, size, dataset):
-        imgs = get_imgs(size, dataset)
+        imgs = get_imgs(size, dataset).to(self.device)
         pictures_obscured = imgs[:,3:]
         pictures_original = imgs[:,:3]
         pictures_restored = self.sample(model, size, pictures_obscured)
+        #also put images to valid range
+        pictures_obscured = valid_pixel_range(pictures_obscured)
+        pictures_original = valid_pixel_range(pictures_original)
+
         return pictures_original, pictures_obscured, pictures_restored
 
 
