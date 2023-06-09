@@ -105,7 +105,7 @@ class Diffusion:
             xm.optimizer_step(optimizer)
             tracker.add(BATCH_SIZE)
             if i % 10 == 0:
-                print(f'[xla:{xm.get_ordinal()}] Loss={loss.item()} Rate={tracker.rate()} GlobalRate={tracker.global_rate()} Time={time.asctime()}')
+                print(f'[xla:{xm.get_ordinal()}] ,cat: {y}, Loss={loss.item()} Rate={tracker.rate()} GlobalRate={tracker.global_rate()} Time={time.asctime()}')
 
 
 
