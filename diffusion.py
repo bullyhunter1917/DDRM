@@ -5,6 +5,7 @@ from tqdm import tqdm
 from torch import optim
 from torch import nn
 from utils import save_images
+from utils import get_imgs
 from torch.utils.tensorboard import SummaryWriter
 
 class Diffusion:
@@ -61,14 +62,16 @@ class Diffusion:
     def sample_timesteps(self,n):
         return torch.randint(low=1, high=self.steps, size=(n,))
     
-    def sample(self, model, n):
+    def sample(self, model, n, images):
+        assert(len(images) == n)
         print(f"Sampling {n} new images....")
         model.eval()
 
         # see Algorithm 2 Sampling from "Denoising Diffusion Probabilistic Models"
         with torch.no_grad():
-            x = torch.randn(n,3,self.img_size, self.img_size, device=self.device)
-
+            x_ = torch.randn(n,3,self.img_size, self.img_size, device=self.device)
+            x = torch.concat((x,images), dim=1)
+            
             for i in tqdm(reversed(range(1, self.steps)), position=0):
                 t = (torch.ones(n) * i).long().to(self.device)
                 predicted_noise = model(x, t)
@@ -104,7 +107,9 @@ class Diffusion:
                 optimizer.step()
                 logger.add_scalar("MSE", loss.item(), global_step=epoch * l + j)
             
-            sampled_images = self.sample(model, 1)
+            NR_OF_SAMPLES = 1
+            smpl_imgs = next_iter(data)[:NR_OF_SAMPLES]
+            sampled_images = self.sample(model, NR_OF_SAMPLES, smpl_imgs[:,3:])
             save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
             torch.save(model.state_dict(), os.path.join("models", f"ckpt.pt"))
 
@@ -112,7 +117,8 @@ class Diffusion:
         
     
 
-    def gen(self, model, size):
-        pictures = self.sample(model, size)
+    def gen(self, model, size, dataset):
+        imgs = get_imgs(size, dataset)[:,3:]
+        pictures = self.sample(model, size, imgs)
         return pictures
 
