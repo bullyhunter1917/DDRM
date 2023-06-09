@@ -55,6 +55,6 @@ if __name__=='__main__':
         _diffusion.train(_model, EPOCH, DEVICE, _trainDataLoader, LR)
     else:
         print('GEN')
-        pictures = _diffusion.gen(_model, args['number'])
+        pictures = _diffusion.gen(_model, args['number'], _cifar10)
         save_images(pictures, f'output\{args["number"]}.jpg')
         #output\GeneratedPics\
