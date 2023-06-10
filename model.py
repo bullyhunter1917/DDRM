@@ -5,11 +5,10 @@ import torchvision
 # Neural network model
 
 class model(nn.Module):
-    def __init__(self, input_channels, output_channels, time_dim=1024, device="cuda"):
+    def __init__(self, input_channels, output_channels, time_dim=1024):
         super().__init__()
 
         self.time_dim = time_dim
-        self.device = device
 
         self.input = DoubleConv(6, 64) # res 128 channels 64
 
@@ -30,10 +29,11 @@ class model(nn.Module):
         self.up4 = Up(128, 64)
 
         self.end = nn.Conv2d(kernel_size=1, in_channels=64, out_channels=output_channels)
-    def pos_encoding(self, t, channels):
+
+    def pos_encoding(self, t, channels,dev):
         inv_freq = 1.0 / (
             10000
-            ** (torch.arange(0, channels, 2, device=self.device).float() / channels)
+            ** (torch.arange(0, channels, 2, device=dev).float() / channels)
         )
 
         pos_enc_a = torch.sin(t.repeat(1, channels//2) * inv_freq)
@@ -42,9 +42,9 @@ class model(nn.Module):
 
         return pos_enc
 
-    def forward(self, x, t):
+    def forward(self, x, t,dev):
         t = t.unsqueeze(-1).type(torch.float)
-        t = self.pos_encoding(t, self.time_dim)
+        t = self.pos_encoding(t, self.time_dim,dev)
 
         x1 = self.input(x)
 

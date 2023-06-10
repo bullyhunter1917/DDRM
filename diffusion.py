@@ -6,6 +6,11 @@ from torch import optim
 from torch import nn
 from utils import *
 from torch.utils.tensorboard import SummaryWriter
+import torch_xla
+import torch_xla.core.xla_model as xm
+import torch_xla.distributed.parallel_loader as pl
+import torch_xla.distributed.xla_multiprocessing as xmp
+#import torch_xla.utils.serialization as xser
 
 class Diffusion:
     def __init__(self, schedule='linear', steps=1000, img_size=128, device='cuda'):
@@ -45,7 +50,7 @@ class Diffusion:
         else:
             raise NotImplementedError(f"unknown beta schedule: {self.schedule}")
 
-    def noise_images(self, x_, t):
+    def noise_images(self, x, t):
         '''
         Noisfied image x at timesteps t
         '''
@@ -53,7 +58,7 @@ class Diffusion:
         sqrt_one_minus_alpha_hat = torch.sqrt(1-self.alpha_hat[t])[:, None, None, None]
         #random noise
         eps = torch.randn_like(x)
-        return torch.concat((sqrt_alpha_hat * x + sqrt_one_minus_alpha_hat * eps, x_obs), dim=1) , eps
+        return sqrt_alpha_hat * x + sqrt_one_minus_alpha_hat * eps , eps
     
     def sample_timesteps(self,n):
         return torch.randint(low=1, high=self.steps, size=(n,))
@@ -69,7 +74,7 @@ class Diffusion:
             
             for i in tqdm(reversed(range(1, self.steps)), position=0):
                 t = (torch.ones(n) * i).long().to(self.device)
-                # with each step get new restored image concat it with obscured and pass to model
+                 # with each step get new restored image concat it with obscured and pass to model
                 predicted_noise = model(torch.concat((x,images),dim=1), t) 
 
                 alpha = self.alpha[t][:, None,None,None]
@@ -78,50 +83,53 @@ class Diffusion:
                 
                 noise = torch.randn_like(x) if i > 1 else torch.zeros_like(x)
 
+                #remove little bit of noise
                 x = 1 / torch.sqrt(alpha) * (x -  ((1-alpha) / (torch.sqrt(1-alpha_hat))) * predicted_noise) + torch.sqrt(beta) * noise
         
         model.train()
         return valid_pixel_range(x)
-    
-    def train(self, model, epochs, device, data,lr):
-        optimizer=optim.AdamW(model.parameters(),lr)
-        lossfunc=nn.MSELoss()
-        l = len(data)
-        logger = SummaryWriter("trainingrun1")
-        for epoch in range(epochs):
-            pbar = tqdm(data)
-            for j, (x, _) in enumerate(pbar):
-                # Those are 6 channels images now, first three Channels are RGB of original later three are from obscured image
-                images = x.to(device)
-                t = self.sample_timesteps(x.shape[0]).to(device)
-                #add noise only to original images
-                x_t, epsilon = self.noise_images(images[:,:3],t)    
-                x_t = torch.concat((x_t, images[:,3:]), dim=1)
 
-                predicted_epsilon = model(x_t,t)
-                loss = lossfunc(epsilon,predicted_epsilon)
-                optimizer.zero_grad()
-                loss.backward()
-                optimizer.step()
-                logger.add_scalar("MSE", loss.item(), global_step=epoch * l + j)
+    def trainfunc(self, model, loader, optimizer):
+        tracker = xm.RateTracker()
+        for i, (x, y) in enumerate(loader):
+            optimizer.zero_grad()
+            t = self.sample_timesteps(x.shape[0]).to(self.device)
+            x_t, epsilon = self.noise_images(x[:,:3], t)
+            x_t = torch.concat((x_t, x[:,3:]), dim=1)
+
+            predicted_epsilon = model(x_t, t, self.device)
+            loss = self.lossfunc(epsilon, predicted_epsilon)
+            loss.backward()
+            xm.optimizer_step(optimizer)
+            tracker.add(BATCH_SIZE)
+            if i % 10 == 0:
+                print(f'[xla:{xm.get_ordinal()}] ,cat: |replace with "y" for cat|, Loss={loss.item()} Rate={tracker.rate()} GlobalRate={tracker.global_rate()} Time={time.asctime()}')
+#                                                                   {y}
+
+
+    def train_xla(self, model, epochs, data,lr):
+        print("trenuje")
+        self.lossfunc = nn.MSELoss()
+        optimizer = optim.AdamW(model.parameters(),lr)
+        for epoch in range(epochs):   
+            para_loader = pl.ParallelLoader(data, [self.device])
+            self.trainfunc(model, para_loader.per_device_loader(self.device), optimizer)
             
-            NR_OF_SAMPLES = 1
-            smpl_images = next(iter(data))[:NR_OF_SAMPLES]                           # gets random images
-            restored_images = self.sample(model, NR_OF_SAMPLES, smpl_imgs[:,3:])     # pass obscured this will return restored
-            save_images(smpl_images[:,:3], os.path.join("results", f"{epoch}.jpg"))  # original images, without obscuration
-            save_images(restored_images, os.path.join("results", f"{epoch}.jpg"))    # restored using diffusion 
-            torch.save(model.state_dict(), os.path.join("models", f"ckpt.pt"))
+            xm.master_print(f'Finished training epoch {epoch}')
+            
+            if epoch%10==0:
+                print(epoch)
+                xm.save(model.state_dict(),os.path.join("models", f"ckpt{epoch}.pt"))
+                
+                #sampling behaves strangely on tpu's so we leave it for local tests
+                #sampled_images = self.sample(model,10)
+                #save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
 
-        
+    
     def gen(self, model, size, dataset):
-        imgs = get_imgs(size, dataset).to(self.device)
+        imgs = get_imgs(size, dataset)
         pictures_obscured = imgs[:,3:]
         pictures_original = imgs[:,:3]
         pictures_restored = self.sample(model, size, pictures_obscured)
-        #also put images to valid range
-        pictures_obscured = valid_pixel_range(pictures_obscured)
-        pictures_original = valid_pixel_range(pictures_original)
-
         return pictures_original, pictures_obscured, pictures_restored
-
 

@@ -1,8 +1,8 @@
-import torchvision
+import random
 import torch
+import torchvision
 from torch.utils.data import DataLoader
 from PIL import Image
-import random
 
 def save_images(images, path, **kwargs):
     grid = torchvision.utils.make_grid(images, **kwargs)
@@ -10,19 +10,20 @@ def save_images(images, path, **kwargs):
     im = Image.fromarray(ndarr)
     print(path)
     im.save(path)
-    
-def get_imgs(sample_size,dataset):
-  (x,_ ) =  next(iter(DataLoader(dataset, sample_size, shuffle=True)))
-  return x
 
 def valid_pixel_range(T):
   T = (T.clamp(-1,1) + 1)/2
   T = (T * 255).type(torch.uint8) #valid pixel range 
   return T
 
+def get_imgs(sample_size,dataset):
+  (x,_ ) =  next(iter(DataLoader(dataset, sample_size, shuffle=True)))
+  return x
+
 class Obscure(object):
     """
-    Add extra 3 channels to image that will represent obscured image
+    Add extra 3 channels to image that will represent image
+    obscured with gray rectangles
     """
     def __init__(self, img_size, rectangles=10, max_rect=0.3):
         self.img_size = img_size
@@ -49,3 +50,4 @@ class Obscure(object):
         y_s = random.randint(y_e-self.max_rect_area,y_e)
         x = self.obscure_image(x, x_s,x_e,y_s,y_e)
       return x
+
