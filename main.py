@@ -15,7 +15,9 @@ import torch_xla.distributed.xla_multiprocessing as xmp
 import torch_xla.utils.utils as xu
 import sys
 
-LSUN_DIR = '' # will fill later, after uploading
+# you can download 50k images from hire
+# https://drive.google.com/file/d/1IMDjxG2ELX9E8fJSeusPSFOS5nh66GHX/view?usp=sharing
+LSUN_DIR = '' #p ath to directory with images
 
 def load_dataset(dataset_name):
     transform = trans.Compose([trans.Resize((SIZE, SIZE)),
