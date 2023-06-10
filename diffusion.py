@@ -12,6 +12,8 @@ import torch_xla.distributed.parallel_loader as pl
 import torch_xla.distributed.xla_multiprocessing as xmp
 #import torch_xla.utils.serialization as xser
 
+BATCH_SIZE = 128
+
 class Diffusion:
     def __init__(self, schedule='linear', steps=1000, img_size=128, device='cuda'):
         self.schedule = schedule
