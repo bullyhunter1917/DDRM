@@ -17,7 +17,7 @@ import sys
 
 # you can download 50k images from here
 # https://drive.google.com/file/d/1IMDjxG2ELX9E8fJSeusPSFOS5nh66GHX/view?usp=sharing
-LSUN_DIR = '' #p ath to directory with images
+LSUN_DIR = '' #path to directory with images
 EPOCH = 500
 BATCH_SIZE = 128
 # Hyperparameters
@@ -32,7 +32,7 @@ def load_dataset(dataset_name):
         _cifar10 = CIFAR10(root='data', train=True, transform=transform, download=True)
         return _cifar10
     elif dataset_name == 'lsun':
-        _lsun  = torchvision.datasets.ImageFolder(root='./LSUN_DIR', transform=transform)
+        _lsun  = torchvision.datasets.ImageFolder(root=LSUN_DIR, transform=transform)
         return _lsun
     else:
         sys.exit("Dataset not implemented")
