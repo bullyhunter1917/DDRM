@@ -14,18 +14,21 @@ import torch_xla.distributed.parallel_loader as pl
 import torch_xla.distributed.xla_multiprocessing as xmp
 import torch_xla.utils.utils as xu
 
+LSUN_DIR = '' # will fill later, after uploading
 
-
-def load_dataset():
+def load_dataset(dataset_name):
     transform = trans.Compose([trans.Resize((SIZE, SIZE)),
                                trans.ToTensor(),
                                Obscure(SIZE)])
+    if dataset_name == 'cifar10':
+        _cifar10 = CIFAR10(root='data', train=True, transform=transform, download=True)
+        return _cifar10
+    elif dataset_name == 'lsun':
+        _lsun  = torchvision.datasets.ImageFolder(root='./LSUN_DIR', transform=transform)
+        return _lsun
+    else:
+        sys.exit("Dataset not implemented")
 
-    _cifar10 = CIFAR10(root='data', train=True, transform=transform, download=True)
-
-    # Trzeba dopisać kolejne datasety
-
-    return _cifar10
 
 def _mp_fn(index, lr):
     
@@ -36,18 +39,19 @@ def _mp_fn(index, lr):
     dev = xm.xla_device()
     print(dev)
     model=WRAPPED_MODEL.to(dev)
-    _cifar10=SERIAL_EXEC.run(load_dataset)
+    loaded_dataset=SERIAL_EXEC.run(lambda: load_dataset(dataset))
     train_sampler = torch.utils.data.distributed.DistributedSampler(
-        _cifar10,
+        loaded_dataset,
         num_replicas=xm.xrt_world_size(),
         rank=xm.get_ordinal(),
         shuffle=True)
     _trainDataLoader = DataLoader(
-        _cifar10, 
+        loaded_dataset,
         batch_size=BATCH_SIZE,
-        sampler=train_sampler, 
+        sampler=train_sampler,
         num_workers=8,
         drop_last=True)
+
     
     _diffusion = diffusion.Diffusion(device=dev)
     _diffusion.train_xla(model, EPOCH, _trainDataLoader, lr)
@@ -59,6 +63,9 @@ if __name__=='__main__':
                     help="path to output trained model")
     ap.add_argument("-n", "--number", type=int, required=True,
                     help="number of pictures to generate. If n is 0 then model will be train")
+    ap.add_argument("-d", "--dataset", type=str, default='cifar10',
+                    help="Dataset to load.")
+
 
     args = vars(ap.parse_args())
 
@@ -75,10 +82,11 @@ if __name__=='__main__':
     
     if args['number'] == 0:
         print("TRENING")
-        xmp.spawn(_mp_fn, 
-                  args=(lr,),
+        xmp.spawn(_mp_fn,
+                  args=(lr,args['dataset']),
                   nprocs=8,
                   start_method='fork')
+
     else:
         #sampling behaves strangely on tpu's so we leave it for local tests
         print('GEN')
