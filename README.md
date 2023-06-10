@@ -2,6 +2,7 @@
 
 ## Usage:
 
+mkdir models
 
 python3 main.py -m models -n 0 -d dataset
 
