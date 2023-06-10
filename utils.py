@@ -48,7 +48,7 @@ class Obscure(object):
         #try to place rectangles evenly
         x_e,y_e = random.sample(range(0, self.img_size), 2)
         x_s = random.randint(x_e-self.max_rect_area, x_e - (self.max_rect_area // 3))
-        y_s = random.randint(y_e-self.max_rect_area,y_e - (self.max_rect_are // 3))
+        y_s = random.randint(y_e-self.max_rect_area,y_e - (self.max_rect_area // 3))
         x = self.obscure_image(x, x_s,x_e,y_s,y_e)
       return x
 

@@ -18,6 +18,11 @@ import sys
 # you can download 50k images from here
 # https://drive.google.com/file/d/1IMDjxG2ELX9E8fJSeusPSFOS5nh66GHX/view?usp=sharing
 LSUN_DIR = '' #p ath to directory with images
+EPOCH = 500
+BATCH_SIZE = 128
+# Hyperparameters
+SIZE = 128
+LR = 3e-4
 
 def load_dataset(dataset_name):
     transform = trans.Compose([trans.Resize((SIZE, SIZE)),
@@ -33,10 +38,8 @@ def load_dataset(dataset_name):
         sys.exit("Dataset not implemented")
 
 
-def _mp_fn(index, lr):
+def _mp_fn(index, lr,dataset):
     
-    EPOCH = 500
-    BATCH_SIZE = 128
 
     torch.set_default_tensor_type('torch.FloatTensor')
     dev = xm.xla_device()
@@ -72,9 +75,6 @@ if __name__=='__main__':
 
     args = vars(ap.parse_args())
 
-    # Hyperparameters
-    SIZE = 128
-    LR = 3e-4
     
 
     SERIAL_EXEC = xmp.MpSerialExecutor()
