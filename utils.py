@@ -25,7 +25,7 @@ class Obscure(object):
     Add extra 3 channels to image that will represent image
     obscured with gray rectangles
     """
-    def __init__(self, img_size, rectangles=10, max_rect=0.3):
+    def __init__(self, img_size, rectangles=4, max_rect=0.4):
         self.img_size = img_size
         self.max_rect_area = int(max_rect * self.img_size)
         self.rectangles = rectangles
@@ -43,11 +43,12 @@ class Obscure(object):
       return x
 
     def random_obscure(self,x):
-      cnt = self.rectangles
+      cnt = random.randint(int(self.rectangles * 0.6) , self.rectangles)
       for i in range(cnt):
+        #try to place rectangles evenly
         x_e,y_e = random.sample(range(0, self.img_size), 2)
-        x_s = random.randint(x_e-self.max_rect_area, x_e)
-        y_s = random.randint(y_e-self.max_rect_area,y_e)
+        x_s = random.randint(x_e-self.max_rect_area, x_e - (self.max_rect_area // 3))
+        y_s = random.randint(y_e-self.max_rect_area,y_e - (self.max_rect_are // 3))
         x = self.obscure_image(x, x_s,x_e,y_s,y_e)
       return x
 
