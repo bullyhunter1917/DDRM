@@ -20,7 +20,7 @@ import os
 # https://drive.google.com/file/d/1IMDjxG2ELX9E8fJSeusPSFOS5nh66GHX/view?usp=sharing
 LSUN_DIR = '' #path to directory with images
 EPOCH = 500
-BATCH_SIZE = 128
+BATCH_SIZE = 12
 
 # Hyperparameters
 SIZE = 128
@@ -71,7 +71,7 @@ def main_gpu(dev, n, dataset, modelpath):
             m.load_state_dict(torch.load(modelpath))
 
         datas = load_dataset(dataset)
-        _train = DataLoader(datas, batch_size=128, shuffle=True)
+        _train = DataLoader(datas, batch_size=BATCH_SIZE, shuffle=True)
         diff.train_gpu(m, 500, _train, LR)
 
     if n != 0:
@@ -103,7 +103,7 @@ if __name__=='__main__':
         xm=__import__("torch_xla.core.xla_model")
         xmp=__import__("torch_xla.distributed.xla_multiprocessing")
         xu=__import__("torch_xla.utils.utils")
-        pl=__import__(torch_xla.distributed.parallel_loader)
+        pl=__import__("torch_xla.distributed.parallel_loader")
 
         SERIAL_EXEC = xmp.MpSerialExecutor()
         WRAPPED_MODEL=xmp.MpModelWrapper(model(6, 3))
