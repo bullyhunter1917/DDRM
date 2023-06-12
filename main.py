@@ -8,11 +8,11 @@ from PIL import Image
 from utils import *
 import torchvision.transforms as trans
 import torch
-import torch_xla
-import torch_xla.core.xla_model as xm
-import torch_xla.distributed.parallel_loader as pl
-import torch_xla.distributed.xla_multiprocessing as xmp
-import torch_xla.utils.utils as xu
+# import torch_xla
+# import torch_xla.core.xla_model as xm
+# import torch_xla.distributed.parallel_loader as pl
+# import torch_xla.distributed.xla_multiprocessing as xmp
+# import torch_xla.utils.utils as xu
 import sys
 import os
 
@@ -21,6 +21,7 @@ import os
 LSUN_DIR = '' #path to directory with images
 EPOCH = 500
 BATCH_SIZE = 128
+
 # Hyperparameters
 SIZE = 128
 LR = 3e-4
@@ -65,16 +66,16 @@ def main_gpu(dev, n, dataset, modelpath):
     diff = diffusion.Diffusion(device=dev)
 
     if n == 0:
-        m = model(6, 3)
+        m = model(6, 3).to(dev)
         if os.path.exists(modelpath):
             m.load_state_dict(torch.load(modelpath))
 
         datas = load_dataset(dataset)
         _train = DataLoader(datas, batch_size=128, shuffle=True)
-        diff.train_gpu(m, 500, _train, lr)
+        diff.train_gpu(m, 500, _train, LR)
 
     if n != 0:
-        m = model(6, 3)
+        m = model(6, 3).to(dev)
         m.load_state_dict(torch.load(modelpath))
         m.eval()
         diff.gen(m, n, dataset=load_dataset(dataset))
@@ -88,19 +89,26 @@ if __name__=='__main__':
                     help="number of pictures to generate. If n is 0 then model will be train")
     ap.add_argument("-d", "--dataset", type=str, default='cifar10',
                     help="Dataset to load.")
-    ap.add_argument('-m', '--mode', type=str, default='gpu', help='On which device model will train')
+    ap.add_argument('-m', '--mode', type=str, default='cuda', help='On which device model will train')
 
     args = vars(ap.parse_args())
 
     
 
-    SERIAL_EXEC = xmp.MpSerialExecutor()
 
-    WRAPPED_MODEL=xmp.MpModelWrapper(model(6, 3))
-    
-    lr=LR*xm.xrt_world_size()
 
     if args['mode'] == 'tpu':
+
+        torch_xla=__import__('torch_xla')
+        xm=__import__("torch_xla.core.xla_model")
+        xmp=__import__("torch_xla.distributed.xla_multiprocessing")
+        xu=__import__("torch_xla.utils.utils")
+        pl=__import__(torch_xla.distributed.parallel_loader)
+
+        SERIAL_EXEC = xmp.MpSerialExecutor()
+        WRAPPED_MODEL=xmp.MpModelWrapper(model(6, 3))
+        lr=LR*xm.xrt_world_size()
+
         print("TRENING")
         xmp.spawn(_mp_fn,
                   args=(lr,args['dataset']),

@@ -7,11 +7,12 @@ from torch import optim
 from torch import nn
 from utils import *
 from torch.utils.tensorboard import SummaryWriter
-import torch_xla
-import torch_xla.core.xla_model as xm
-import torch_xla.distributed.parallel_loader as pl
-import torch_xla.distributed.xla_multiprocessing as xmp
-#import torch_xla.utils.serialization as xser
+# import torch_xla
+# import torch_xla.core.xla_model as xm
+# import torch_xla.distributed.parallel_loader as pl
+# import torch_xla.distributed.xla_multiprocessing as xmp
+
+
 
 from main import BATCH_SIZE
 
@@ -78,7 +79,7 @@ class Diffusion:
             for i in tqdm(reversed(range(1, self.steps)), position=0):
                 t = (torch.ones(n) * i).long().to(self.device)
                  # with each step get new restored image concat it with obscured and pass to model
-                predicted_noise = model(torch.concat((x,images),dim=1), t) 
+                predicted_noise = model(torch.concat((x,images),dim=1), t,self.device) 
 
                 alpha = self.alpha[t][:, None,None,None]
                 alpha_hat = self.alpha_hat[t][:, None, None, None]
@@ -94,6 +95,7 @@ class Diffusion:
 
 
     def train_gpu(self, model, epochs, data, lr):
+        
         print('Trenuje na gpu')
         optimizer = optim.AdamW(model.parameters(), lr)
         lossfunc = nn.MSELoss()
@@ -105,7 +107,7 @@ class Diffusion:
                 images = x.to(self.device)
                 t = self.sample_timesteps(x.shape[0]).to(self.device)
                 x_t, epsilon = self.noise_images(images, t)
-                predicted_epsilon = model(x_t, t)
+                predicted_epsilon = model(x_t, t,self.device)
                 loss = lossfunc(epsilon, predicted_epsilon)
                 optimizer.zero_grad()
                 loss.backward()
@@ -118,6 +120,11 @@ class Diffusion:
 
 
     def train_xla(self, model, epochs, data, lr):
+        torch_xla=__import__('torch_xla')
+        xm=__import__("torch_xla.core.xla_model")
+        xmp=__import__("torch_xla.distributed.xla_multiprocessing")
+        xu=__import__("torch_xla.utils.utils")
+        pl=__import__("torch_xla.distributed.parallel_loader")
         def trainfunc(model, loader, optimizer):
             tracker = xm.RateTracker()
             for i, (x, y) in enumerate(loader):
