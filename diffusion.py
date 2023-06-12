@@ -92,38 +92,64 @@ class Diffusion:
         model.train()
         return valid_pixel_range(x)
 
-    def trainfunc(self, model, loader, optimizer):
-        tracker = xm.RateTracker()
-        for i, (x, y) in enumerate(loader):
-            optimizer.zero_grad()
-            t = self.sample_timesteps(x.shape[0]).to(self.device)
-            x_t, epsilon = self.noise_images(x[:,:3], t)
-            x_t = torch.concat((x_t, x[:,3:]), dim=1)
 
-            predicted_epsilon = model(x_t, t, self.device)
-            loss = self.lossfunc(epsilon, predicted_epsilon)
-            loss.backward()
-            xm.optimizer_step(optimizer)
-            tracker.add(BATCH_SIZE)
-            if i % 10 == 0:
-                print(f'[xla:{xm.get_ordinal()}] ,cat: |replace with "y" for cat|, Loss={loss.item()} Rate={tracker.rate()} GlobalRate={tracker.global_rate()} Time={time.asctime()}')
-#                                                                   {y}
+    def train_gpu(self, model, epochs, data, lr):
+        print('Trenuje na gpu')
+        optimizer = optim.AdamW(model.parameters(), lr)
+        lossfunc = nn.MSELoss()
+        l = len(data)
+        logger = SummaryWriter("trainingrun1")
+        for epoch in range(epochs):
+            pbar = tqdm(data)
+            for j, (x, _) in enumerate(pbar):
+                images = x.to(self.device)
+                t = self.sample_timesteps(x.shape[0]).to(self.device)
+                x_t, epsilon = self.noise_images(images, t)
+                predicted_epsilon = model(x_t, t)
+                loss = lossfunc(epsilon, predicted_epsilon)
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+                logger.add_scalar("MSE", loss.item(), global_step=epoch * l + j)
+
+            sampled_images = self.sample(model, 1)
+            save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
+            torch.save(model.state_dict(), os.path.join("models", f"ckpt.pt"))
 
 
-    def train_xla(self, model, epochs, data,lr):
-        print("trenuje")
+    def train_xla(self, model, epochs, data, lr):
+        def trainfunc(model, loader, optimizer):
+            tracker = xm.RateTracker()
+            for i, (x, y) in enumerate(loader):
+                optimizer.zero_grad()
+                t = self.sample_timesteps(x.shape[0]).to(self.device)
+                x_t, epsilon = self.noise_images(x[:, :3], t)
+                x_t = torch.concat((x_t, x[:, 3:]), dim=1)
+
+                predicted_epsilon = model(x_t, t, self.device)
+                loss = self.lossfunc(epsilon, predicted_epsilon)
+                loss.backward()
+                xm.optimizer_step(optimizer)
+                tracker.add(BATCH_SIZE)
+                if i % 10 == 0:
+                    print(
+                        f'[xla:{xm.get_ordinal()}] ,cat: |replace with "y" for cat|, Loss={loss.item()} Rate={tracker.rate()} GlobalRate={tracker.global_rate()} Time={time.asctime()}')
+
+        #                                                                   {y}
+
+        print("Trenuje na tpu")
         self.lossfunc = nn.MSELoss()
         optimizer = optim.AdamW(model.parameters(),lr)
-        for epoch in range(epochs):   
+        for epoch in range(epochs):
             para_loader = pl.ParallelLoader(data, [self.device])
-            self.trainfunc(model, para_loader.per_device_loader(self.device), optimizer)
-            
+            trainfunc(model, para_loader.per_device_loader(self.device), optimizer)
+
             xm.master_print(f'Finished training epoch {epoch}')
-            
+
             if epoch%10==0:
                 print(epoch)
                 xm.save(model.state_dict(),os.path.join("models", f"ckpt{epoch}.pt"))
-                
+
                 #sampling behaves strangely on tpu's so we leave it for local tests
                 #sampled_images = self.sample(model,10)
                 #save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
