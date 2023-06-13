@@ -137,7 +137,7 @@ class Diffusion:
                 tracker.add(BATCH_SIZE)
                 if i % 10 == 0:
                     print(
-                        f'[xla:{xm.get_ordinal()}] ,cat: |replace with "y" for cat|, Loss={loss.item()} Rate={tracker.rate()} GlobalRate={tracker.global_rate()} Time={time.asctime()}')
+                        f'[xla:{xm.get_ordinal()}] , Loss={loss.item()} Rate={tracker.rate()} GlobalRate={tracker.global_rate()} Time={time.asctime()}')
 
         #                                                                   {y}
 
@@ -150,9 +150,9 @@ class Diffusion:
 
             xm.master_print(f'Finished training epoch {epoch}')
 
-            if epoch%10==0:
-                print(epoch)
-                xm.save(model.state_dict(),os.path.join("models", f"ckpt{epoch}.pt"))
+            #epochs will take longer so we will save model state in all iterations
+            print(epoch)
+            xm.save(model.state_dict(),os.path.join("models", f"ckpt{epoch}.pt"))
 
                 #sampling behaves strangely on tpu's so we leave it for local tests
                 #sampled_images = self.sample(model,10)
