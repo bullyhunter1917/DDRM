@@ -99,8 +99,6 @@ class Diffusion:
         print('Trenuje na gpu')
         optimizer = optim.AdamW(model.parameters(), lr)
         lossfunc = nn.MSELoss()
-        l = len(data)
-        logger = SummaryWriter("trainingrun1")
         for epoch in range(epochs):
             pbar = tqdm(data)
             for j, (x, _) in enumerate(pbar):
@@ -112,7 +110,6 @@ class Diffusion:
                 optimizer.zero_grad()
                 loss.backward()
                 optimizer.step()
-                logger.add_scalar("MSE", loss.item(), global_step=epoch * l + j)
 
             sampled_images = self.sample(model, 1)
             save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
