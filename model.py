@@ -31,7 +31,7 @@ class model(nn.Module):
         self.up3 = Up(256, 64)
         self.sa7 = SelfAttention(64, 64)
         self.up4 = Up(128, 64)
-        self.sa8 = SelfAttention(64, 128)
+        #self.sa8 = SelfAttention(64, 128)
 
         self.end = nn.Conv2d(kernel_size=1, in_channels=64, out_channels=output_channels)
 
@@ -72,7 +72,7 @@ class model(nn.Module):
         x = self.up3(x, x2, t)
         x = self.sa7(x)
         x = self.up4(x, x1, t)
-        x = self.sa8(x)
+        #x = self.sa8(x)
 
         x = self.end(x)
 
