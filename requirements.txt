@@ -1,0 +1,8 @@
+gdown==4.7.1
+lmdb==1.4.1
+Pillow==9.4.0
+Pillow==9.5.0
+torch==1.13.0
+torch_xla==1.13
+torchvision==0.14.0
+tqdm==4.65.0

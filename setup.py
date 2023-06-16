@@ -12,8 +12,9 @@ import tarfile
 
 PATH = './'
 LSUN = 'lsun'
+DEVICE = 'TPU'
 
-
+#directory with preprocessed by us to 128x128 300 k subset of lsun bedroom dataset
 URL = "https://drive.google.com/u/0/uc?id=147Mok0tiLTA43WmfBMXnzL0bNOX1mSVh&export=download"
 OUTPUT = "lsun.tar.xz"
 
@@ -34,5 +35,7 @@ if __name__ == '__main__':
         with tarfile.open(PATH + LSUN + '.tar.xz') as f:
             f.extractall(PATH)
 
-    #setting up tpu
-    os.system("export XRT_TPU_CONFIG='localservice;0;localhost:51011'")
+    if DEVICE == 'TPU':
+        #setting up tpu
+        print("Setting up TPU...")
+        os.system("export XRT_TPU_CONFIG='localservice;0;localhost:51011'")

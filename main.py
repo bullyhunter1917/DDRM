@@ -8,6 +8,7 @@ from PIL import Image
 from utils import *
 import torchvision.transforms as trans
 import torch
+# if you are getting errors on TPU uncomment those imports and, comment lines 107 to 111
 # import torch_xla
 # import torch_xla.core.xla_model as xm
 # import torch_xla.distributed.parallel_loader as pl
@@ -18,18 +19,18 @@ import os
 
 # you can download 50k images from here
 # https://drive.google.com/file/d/1IMDjxG2ELX9E8fJSeusPSFOS5nh66GHX/view?usp=sharing
-LSUN_DIR = '' #path to directory with images
-EPOCH = 500
-BATCH_SIZE = 12
+LSUN_DIR = './lsun' #path to directory with images, this directory should exists after running setup.py
+EPOCH = 50
+BATCH_SIZE = 8
 
 # Hyperparameters
 SIZE = 128
 LR = 3e-4
 
-def load_dataset(dataset_name):
+def load_dataset(dataset_name,transform_train=True):
     transform = trans.Compose([trans.Resize((SIZE, SIZE)),
                                trans.ToTensor(),
-                               Obscure(SIZE)])
+                               Obscure(SIZE,train=transform_train)])
     if dataset_name == 'cifar10':
         _cifar10 = CIFAR10(root='data', train=True, transform=transform, download=True)
         return _cifar10
@@ -69,7 +70,6 @@ def main_gpu(dev, n, dataset, modelpath):
         m = model(6, 3).to(dev)
         if os.path.exists(modelpath):
             m.load_state_dict(torch.load(modelpath))
-
         datas = load_dataset(dataset)
         _train = DataLoader(datas, batch_size=BATCH_SIZE, shuffle=True)
         diff.train_gpu(m, 500, _train, LR)
@@ -78,7 +78,7 @@ def main_gpu(dev, n, dataset, modelpath):
         m = model(6, 3).to(dev)
         m.load_state_dict(torch.load(modelpath))
         m.eval()
-        diff.gen(m, n, dataset=load_dataset(dataset))
+        diff.gen(m, n, dataset=load_dataset(dataset,transform_train=False))
 
 
 if __name__=='__main__':

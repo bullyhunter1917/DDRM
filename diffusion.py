@@ -104,6 +104,7 @@ class Diffusion:
             for j, (x, _) in enumerate(pbar):
                 images = x.to(self.device)
                 t = self.sample_timesteps(x.shape[0]).to(self.device)
+                
                 x_t, epsilon = self.noise_images(images, t)
                 predicted_epsilon = model(x_t, t,self.device)
                 loss = lossfunc(epsilon, predicted_epsilon)
@@ -133,6 +134,7 @@ class Diffusion:
                 predicted_epsilon = model(x_t, t, self.device)
                 loss = self.lossfunc(epsilon, predicted_epsilon)
                 loss.backward()
+                self.loss = loss
                 xm.optimizer_step(optimizer)
                 tracker.add(BATCH_SIZE)
                 if i % 10 == 0:
@@ -152,17 +154,25 @@ class Diffusion:
 
             #epochs will take longer so we will save model state in all iterations
             print(epoch)
-            xm.save(model.state_dict(),os.path.join("models", f"ckpt{epoch}.pt"))
+            xm.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'loss': self.loss,
+            }, os.path.join("models", f"ckpt{epoch}.pt"))
 
-                #sampling behaves strangely on tpu's so we leave it for local tests
-                #sampled_images = self.sample(model,10)
-                #save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
+            #sampling behaves strangely on tpu's so we leave it for local tests
+            #sampled_images = self.sample(model,10)
+            #save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
 
-    
+
+    # this function will be called when testing, it will use 9 channels 
+    # obscured_noise will be used as input to model
+    # but to presend results we will use image with grayscales_mask
     def gen(self, model, size, dataset):
         imgs = get_imgs(size, dataset)
-        pictures_obscured = imgs[:,3:]
+        pictures_obscured_gray = imgs[:,6:]
+        pictures_obscured_noise = imgs[:,3:6]
         pictures_original = imgs[:,:3]
-        pictures_restored = self.sample(model, size, pictures_obscured)
-        return pictures_original, pictures_obscured, pictures_restored
-
+        pictures_restored = self.sample(model, size, pictures_obscured_noise)
+        return pictures_original, pictures_obscured_gray, pictures_restored

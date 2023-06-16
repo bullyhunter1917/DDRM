@@ -2,11 +2,9 @@
 
 ## Usage:
 
-mkdir models
+pip3 install -r requirements.txt
 
-python3 main.py -m models -n 0 -d dataset
+python3 setup.py
 
-Where dataset is one of lsun, cifar10
-
-if you are going to use lsun you also need to provide path for folder with images in main.py
+python3 main.py -mp models -n 0 -d lsun -m tpu
 
