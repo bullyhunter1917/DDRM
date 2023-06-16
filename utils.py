@@ -33,15 +33,15 @@ class Obscure(object):
 
 
     def __call__(self, img):
-        obscured_noise = self.random_obscure(img.clone(), self.obscure_image_noise)
         if self.train:
+          obscured_noise = self.random_obscure(img.clone())
           return torch.concat((img,obscured_noise), dim=0)
         #for testing create both grayscaled and noisified rectangles
         else:  
-          obscured_gray  = self.random_obscure(img.clone(), self.obscure_image_gray)
-          return torch.concat((img,obscured_noise, obscured_gray), dim=0)
+          obscured_noise, obscured_gray  = self.random_obscure(torch.concat((img.clone(),img.clone()),dim=0))
+          return torch.concat((img, obscured_noise, obscured_gray), dim=0)
 
-    def obscure_image_gray(self,x, x_s,x_e,y_s,y_e):
+    def obscure_image_grey(self,x, x_s,x_e,y_s,y_e):
       if x_e < x_s:
         x_e,x_s = x_s,x_e
       if y_e < y_s:
@@ -58,13 +58,21 @@ class Obscure(object):
 
       return x
 
-    def random_obscure(self,x, obscure_fun):
+    def random_obscure(self,x):
+      if not self.train:
+         x = x [:3]
+         x_grey = x[:3]
       cnt = random.randint(int(self.rectangles * 0.8) , self.rectangles)
       for i in range(cnt):
         #try to place rectangles evenly
         x_e,y_e = random.sample(range(0, self.img_size), 2)
         x_s = random.randint(x_e-self.max_rect_area, x_e)
         y_s = random.randint(y_e-self.max_rect_area,y_e)
-        x = obscure_fun(x, x_s,x_e,y_s,y_e)
-      return x
+        x = self.obscure_image_noise(x, x_s,x_e,y_s,y_e)
+        if self.train:
+          return x
+        else:
+          x_grey = self.obscure_image_noise(x, x_s,x_e,y_s,y_e)
+          return x, x_grey     
+
 
