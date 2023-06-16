@@ -72,7 +72,7 @@ class Obscure(object):
         if self.train:
           return x
         else:
-          x_grey = self.obscure_image_noise(x, x_s,x_e,y_s,y_e)
+          x_grey = self.obscure_image_grey(x, x_s,x_e,y_s,y_e)
           return x, x_grey     
 
 
