@@ -8,6 +8,7 @@ from PIL import Image
 from utils import *
 import torchvision.transforms as trans
 import torch
+import numpy as np
 
 import sys
 import os
@@ -74,9 +75,9 @@ def main_gpu(dev, n, dataset, modelpath):
         m.load_state_dict(torch.load(modelpath))
         m.eval()
         original,broken,restored=diff.gen(m, n, dataset=load_dataset(dataset,transform_train=False))
-        save_images(original,"\pictures\original.jpg")
-        save_images(broken,"\pictures\broken.jpg")
-        save_images(restored,"\pictures\restored.jpg")
+        save_images(original,os.path.join("pictures", "original.jpg"))
+        save_images(broken,os.path.join("pictures", "broken.jpg"))
+        save_images(restored,os.path.join("pictures", "restored.jpg"))
 
 
 
