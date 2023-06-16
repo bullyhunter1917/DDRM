@@ -8,12 +8,7 @@ from PIL import Image
 from utils import *
 import torchvision.transforms as trans
 import torch
-# if you are getting errors on TPU uncomment those imports and, comment lines 107 to 111
-# import torch_xla
-# import torch_xla.core.xla_model as xm
-# import torch_xla.distributed.parallel_loader as pl
-# import torch_xla.distributed.xla_multiprocessing as xmp
-# import torch_xla.utils.utils as xu
+
 import sys
 import os
 
@@ -99,11 +94,11 @@ if __name__=='__main__':
 
     if args['mode'] == 'tpu':
 
-        torch_xla=__import__('torch_xla')
-        xm=__import__("torch_xla.core.xla_model")
-        xmp=__import__("torch_xla.distributed.xla_multiprocessing")
-        xu=__import__("torch_xla.utils.utils")
-        pl=__import__("torch_xla.distributed.parallel_loader")
+        import torch_xla
+        import torch_xla.core.xla_model as xm
+        import torch_xla.distributed.parallel_loader as pl
+        import torch_xla.distributed.xla_multiprocessing as xmp
+        import torch_xla.utils.utils as xu
 
         SERIAL_EXEC = xmp.MpSerialExecutor()
         WRAPPED_MODEL=xmp.MpModelWrapper(model(6, 3))

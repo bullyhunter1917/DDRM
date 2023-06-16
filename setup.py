@@ -35,7 +35,4 @@ if __name__ == '__main__':
         with tarfile.open(PATH + LSUN + '.tar.xz') as f:
             f.extractall(PATH)
 
-    if DEVICE == 'TPU':
-        #setting up tpu
-        print("Setting up TPU...")
-        os.system("export XRT_TPU_CONFIG='localservice;0;localhost:51011'")
+
