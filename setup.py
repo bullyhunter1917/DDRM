@@ -15,7 +15,7 @@ LSUN = 'lsun'
 DEVICE = 'TPU'
 
 #directory with preprocessed by us to 128x128 300 k subset of lsun bedroom dataset
-URL = "https://drive.google.com/u/0/uc?id=147Mok0tiLTA43WmfBMXnzL0bNOX1mSVh&export=download"
+URL = "https://drive.google.com/u/0/uc?id=147Mok0tiLTA43WmfBMXnzL0bNOX1mSVh&export=download&confirm=t"
 OUTPUT = "lsun.tar.xz"
 
 if __name__ == '__main__':
