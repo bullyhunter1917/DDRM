@@ -70,10 +70,11 @@ class Obscure(object):
         x_s = random.randint(x_e-self.max_rect_area, x_e)
         y_s = random.randint(y_e-self.max_rect_area,y_e)
         x = self.obscure_image_noise(x, x_s,x_e,y_s,y_e)
-        if self.train:
-          return x
-        else:
+        if not self.train:
           x_grey = self.obscure_image_grey(x, x_s,x_e,y_s,y_e)
+      if self.train:
+          return x
+      else:
           return x, x_grey     
 
 
