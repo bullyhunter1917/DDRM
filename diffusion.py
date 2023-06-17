@@ -17,7 +17,7 @@ from torch.utils.tensorboard import SummaryWriter
 from main import BATCH_SIZE
 
 class Diffusion:
-    def __init__(self, schedule='linear', steps=1000, img_size=128, device='cuda'):
+    def __init__(self, optimizer, schedule='linear', steps=1000, img_size=128, device='cuda'):
         self.schedule = schedule
         self.steps = steps
         self.img_size = img_size
@@ -26,6 +26,9 @@ class Diffusion:
         self.beta = self.make_noise_schedule()
         self.alpha = 1-self.beta
         self.alpha_hat = torch.cumprod(self.alpha, dim=0)
+
+        self.optimizer = optimizer
+            
 
     def make_noise_schedule(self):
         ''' 
@@ -97,7 +100,6 @@ class Diffusion:
     def train_gpu(self, model, epochs, data, lr):
         
         print('Trenuje na gpu')
-        optimizer = optim.AdamW(model.parameters(), lr)
         lossfunc = nn.MSELoss()
         for epoch in range(epochs):
             pbar = tqdm(data)
@@ -108,9 +110,9 @@ class Diffusion:
                 x_t, epsilon = self.noise_images(images, t)
                 predicted_epsilon = model(x_t, t,self.device)
                 loss = lossfunc(epsilon, predicted_epsilon)
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
                 loss.backward()
-                optimizer.step()
+                self.optimizer.step()
 
             sampled_images = self.sample(model, 1)
             save_images(sampled_images, os.path.join("results", f"{epoch}.jpg"))
@@ -146,10 +148,9 @@ class Diffusion:
 
         print("Trenuje na tpu")
         self.lossfunc = nn.MSELoss()
-        optimizer = optim.AdamW(model.parameters(),lr)
         for epoch in range(epochs):
             para_loader = pl.ParallelLoader(data, [self.device])
-            trainfunc(model, para_loader.per_device_loader(self.device), optimizer)
+            trainfunc(model, para_loader.per_device_loader(self.device), self.optimizer)
 
             xm.master_print(f'Finished training epoch {epoch}')
 
@@ -158,7 +159,7 @@ class Diffusion:
             xm.save({
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
-            'optimizer_state_dict': optimizer.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
             'loss': self.loss,
             }, os.path.join("models", f"ckpt{epoch}.pt"))
 
@@ -171,7 +172,7 @@ class Diffusion:
     # obscured_noise will be used as input to model
     # but to presend results we will use image with grayscales_mask
     def gen(self, model, size, dataset):
-        imgs = get_imgs(size, dataset).to(self.device)
+        imgs = get_imgs(size, dataset)
         pictures_obscured_gray = imgs[:,6:]
         pictures_obscured_noise = imgs[:,3:6]
         pictures_original = imgs[:,:3]
