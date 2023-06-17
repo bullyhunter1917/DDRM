@@ -172,7 +172,7 @@ class Diffusion:
     # obscured_noise will be used as input to model
     # but to presend results we will use image with grayscales_mask
     def gen(self, model, size, dataset):
-        imgs = get_imgs(size, dataset)
+        imgs = get_imgs(size, dataset).to(self.device)
         pictures_obscured_gray = imgs[:,6:]
         pictures_obscured_noise = imgs[:,3:6]
         pictures_original = imgs[:,:3]

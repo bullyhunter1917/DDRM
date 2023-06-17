@@ -8,6 +8,7 @@ from PIL import Image
 from utils import *
 import torchvision.transforms as trans
 import torch
+from torch import optim
 
 import sys
 import os
@@ -102,7 +103,6 @@ if __name__=='__main__':
 
         SERIAL_EXEC = xmp.MpSerialExecutor()
 
-        from torch import optim
      
         model = model(6,3)
         lr=LR*xm.xrt_world_size()
