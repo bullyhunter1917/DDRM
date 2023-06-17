@@ -56,7 +56,7 @@ def _mp_fn(index, lr, dataset):
         drop_last=True)
 
     
-    _diffusion = diffusion.Diffusion(device=dev)
+    _diffusion = diffusion.Diffusion(device=dev, schedule='cosine')
     _diffusion.train_xla(model, EPOCH, _trainDataLoader, lr)
 
 def main_gpu(dev, n, dataset, modelpath):
