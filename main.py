@@ -75,6 +75,10 @@ def main_gpu(dev, n, dataset, modelpath,optimizer):
         m.load_state_dict(torch.load(modelpath))
         m.eval()
         diff.gen(m, n, dataset=load_dataset(dataset,transform_train=False))
+        original,broken,restored=diff.gen(m, n, dataset=load_dataset(dataset,transform_train=False))
+        save_input(original,os.path.join("pictures", "original.jpg"))
+        save_input(broken,os.path.join("pictures", "broken.jpg"))
+        save_images(restored,os.path.join("pictures", "restored.jpg"))
 
 
 if __name__=='__main__':
