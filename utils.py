@@ -4,6 +4,8 @@ import torchvision
 from torch.utils.data import DataLoader
 from PIL import Image
 import numpy as np
+import re
+import glob
 
 def save_input(images, path, **kwargs):
     grid = torchvision.utils.make_grid(images, **kwargs)
@@ -85,5 +87,29 @@ class Obscure(object):
           return x
       else:
           return x, x_grey 
+
+
+def extract_numbers(string):
+    pattern = r"(\d+)\.pt$"
+    match = re.search(pattern, string)
+    if match:
+        number = match.group(1)
+        return int(number)
+    else:
+        return None
+
+
+def find_best_model(filename, extension):
+    current_directory = os.getcwd()
+    current_directory += '/models'
+    file_pattern = f"{filename}*.{extension}"
+
+    matching_files = glob.glob(os.path.join(current_directory, file_pattern))
+    if matching_files == []:
+        return None
+
+    nrs = [extract_numbers(s) for s in matching_files]
+    nr = max(nrs)
+    return(current_directory + f'/{filename}{nr}.{extension}')
 
 
