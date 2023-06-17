@@ -70,8 +70,8 @@ class Obscure(object):
 
     def random_obscure(self,x):
       if not self.train:
+         x_grey = x[3:]
          x = x [:3]
-         x_grey = x[:3]
       cnt = random.randint(int(self.rectangles * 0.8) , self.rectangles)
       for i in range(cnt):
         #try to place rectangles evenly
@@ -80,10 +80,10 @@ class Obscure(object):
         y_s = random.randint(y_e-self.max_rect_area,y_e)
         x = self.obscure_image_noise(x, x_s,x_e,y_s,y_e)
         if not self.train:
-          x_grey = self.obscure_image_grey(x, x_s,x_e,y_s,y_e)
+          x_grey = self.obscure_image_grey(x_grey, x_s,x_e,y_s,y_e)
       if self.train:
           return x
       else:
-          return x, x_grey     
+          return x, x_grey 
 
 
