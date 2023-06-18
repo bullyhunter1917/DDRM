@@ -107,7 +107,7 @@ class Down(nn.Module):
         self.down = nn.Sequential(
             nn.MaxPool2d(kernel_size=2),
             DoubleConv(input_channels, input_channels, residual=True),
-            DoubleConv(input_channels, output_channels, residual=True)
+            DoubleConv(input_channels, output_channels)
         )
 
         self.emb_layer = nn.Sequential(

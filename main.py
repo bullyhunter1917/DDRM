@@ -8,7 +8,7 @@ from PIL import Image
 from utils import *
 import torchvision.transforms as trans
 import torch
-import numpy as np
+from torch import optim
 
 import sys
 import os
@@ -37,7 +37,7 @@ def load_dataset(dataset_name,transform_train=True):
         sys.exit("Dataset not implemented")
 
 
-def _mp_fn(index, lr, dataset):
+def _mp_fn(index, lr, dataset, optimizer):
     torch.set_default_tensor_type('torch.FloatTensor')
     dev = xm.xla_device()
     print(dev)
@@ -56,29 +56,30 @@ def _mp_fn(index, lr, dataset):
         drop_last=True)
 
     
-    _diffusion = diffusion.Diffusion(device=dev, schedule='cosine')
+    _diffusion = diffusion.Diffusion(optimizer=optimizer,device=dev,schedule='cosine')
     _diffusion.train_xla(model, EPOCH, _trainDataLoader, lr)
 
-def main_gpu(dev, n, dataset, modelpath):
-    diff = diffusion.Diffusion(device=dev)
+def main_gpu(dev, n, dataset, modelpath,optimizer):
+    m = model(6, 3).to(dev)
+    optimizer = optim.AdamW(model.parameters(),LR)
+    diff = diffusion.Diffusion(optimizer=optimizer,device=dev)
 
     if n == 0:
-        m = model(6, 3).to(dev)
-        if os.path.exists(modelpath):
-            m.load_state_dict(torch.load(modelpath))
+        best_model = find_best_model(args['modelpath'],'ckpt', 'pt')
+        if best_model:
+            checkpoint = torch.load(best_model)
+            m.load_state_dict(checkpoint['model_state_dict'])
         datas = load_dataset(dataset)
         _train = DataLoader(datas, batch_size=BATCH_SIZE, shuffle=True)
         diff.train_gpu(m, 500, _train, LR)
 
     if n != 0:
-        m = model(6, 3).to(dev)
-        m.load_state_dict(torch.load(modelpath))
+        m.load_state_dict(torch.load(modelpath)['model_state_dict'])
         m.eval()
         original,broken,restored=diff.gen(m, n, dataset=load_dataset(dataset,transform_train=False))
         save_input(original,os.path.join("pictures", "original.jpg"))
         save_input(broken,os.path.join("pictures", "broken.jpg"))
         save_images(restored,os.path.join("pictures", "restored.jpg"))
-
 
 
 if __name__=='__main__':
@@ -106,12 +107,28 @@ if __name__=='__main__':
         import torch_xla.utils.utils as xu
 
         SERIAL_EXEC = xmp.MpSerialExecutor()
-        WRAPPED_MODEL=xmp.MpModelWrapper(model(6, 3))
+
+     
+        model = model(6,3)
         lr=LR*xm.xrt_world_size()
+
+        optimizer = optim.AdamW(model.parameters(),lr)
+
+
+        best_model = find_best_model(args['modelpath'],'ckpt', 'pt')
+        if best_model:
+            checkpoint = torch.load(best_model)
+            model.load_state_dict(checkpoint['model_state_dict'])
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            print("model loaded")
+        
+
+        WRAPPED_MODEL=xmp.MpModelWrapper(model)
+        
 
         print("TRENING")
         xmp.spawn(_mp_fn,
-                  args=(lr,args['dataset']),
+                  args=(lr,args['dataset'], optimizer),
                   nprocs=8,
                   start_method='fork')
     else:
