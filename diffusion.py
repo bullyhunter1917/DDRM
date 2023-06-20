@@ -22,12 +22,13 @@ class Diffusion:
         self.steps = steps
         self.img_size = img_size
         self.device = device
-
+        self.optimizer = optimizer
+        
         self.beta = self.make_noise_schedule()
         self.alpha = 1-self.beta
         self.alpha_hat = torch.cumprod(self.alpha, dim=0)
+        self.alpha_hat_prev = torch.cat( ( torch.Tensor([1.]).to(self.device), self.alpha_hat[:-1]))
 
-        self.optimizer = optimizer
             
 
     def make_noise_schedule(self):
@@ -77,22 +78,33 @@ class Diffusion:
 
         # see Algorithm 2 Sampling from "Denoising Diffusion Probabilistic Models"
         with torch.no_grad():
-            x = torch.randn(n,3,self.img_size, self.img_size, device=self.device)
+            #restored image at timestep t
+            y_t = torch.randn(n,3,self.img_size, self.img_size, device=self.device)
             
             for i in tqdm(reversed(range(1, self.steps)), position=0):
                 t = (torch.ones(n) * i).long().to(self.device)
-                 # with each step get new restored image concat it with obscured and pass to model
-                predicted_noise = model(torch.concat((x,images),dim=1), t,self.device) 
-
-                alpha = self.alpha[t][:, None,None,None]
-                alpha_hat = self.alpha_hat[t][:, None, None, None]
-                beta = self.beta[t][:, None, None, None]
                 
-                noise = torch.randn_like(x) if i > 1 else torch.zeros_like(x)
+                alpha = self.alpha[t][:, None,None,None]
+                alpha_hat = self.alpha_hat[t][:, None, None, None] #gamma at timestep t
+                alpha_hat_prev = self.alpha_hat_prev[t][:, None, None, None] #gamma at timestep t
+                beta = self.beta[t][:, None, None, None] # beta is 1-alpha
+                
+                noise_level =  alpha_hat 
+                
+                predicted_noise = model(torch.concat((y_t,images),dim=1), t,self.device) 
 
-                #remove little bit of noise
-                x = 1 / torch.sqrt(alpha) * (x -  ((1-alpha) / (torch.sqrt(1-alpha_hat))) * predicted_noise) + torch.sqrt(beta) * noise
-        
+                #predict start from noise                
+                y_0_approx = torch.sqrt(1 / alpha_hat) * y_t - torch.sqrt(1/alpha_hat - 1) * predicted_noise
+
+                y_0_approx.clip_(-1.,1.)
+
+                model_mean = beta * torch.sqrt(alpha_hat_prev) / (1 - alpha_hat) * y_0_approx + (1 - alpha_hat_prev) * torch.sqrt(alpha) / (1 - alpha_hat) * y_t
+                model_log_variance_clipped = torch.log(torch.max(beta * (1-alpha_hat_prev) / (1-alpha_hat) , torch.tensor([1e-20]).to(self.device) ))
+
+                noise = torch.randn_like(y_t) if i > 1 else torch.zeros_like(y_t)
+
+                y_t = model_mean + noise * (0.5 * model_log_variance_clipped).exp()
+
         model.train()
         return valid_pixel_range(x)
 
